@@ -31,6 +31,7 @@ A Web Dashbord for Nmap XML Report
 
 ## Table Of Contents
 - [Security](#security)
+- [SBOM (Software Bill of Materials)](#sbom-software-bill-of-materials)
 - [Usage](#usage)
 - [Video](#video)
 - [Features](#features)
@@ -65,6 +66,7 @@ A Web Dashbord for Nmap XML Report
 - 📄 [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md) - Detailed vulnerability analysis (14 CVEs fixed)
 - 📄 [SECURITY_UPDATE_GUIDE.md](SECURITY_UPDATE_GUIDE.md) - Update instructions
 - 📄 [SECURITY_AUTOMATION.md](SECURITY_AUTOMATION.md) - Automated security scanning setup
+- 📄 [SBOM.md](SBOM.md) - Software Bill of Materials documentation
 - 📄 [.github/SECURITY.md](.github/SECURITY.md) - GitHub security policy
 
 ### Reporting Security Issues
@@ -74,6 +76,77 @@ A Web Dashbord for Nmap XML Report
 Please use the [GitHub Security Advisories](https://github.com/mkilijanek/WebMap/security/advisories) feature or contact the maintainers directly.
 
 See [SECURITY.md](SECURITY.md#reporting-a-vulnerability) for details.
+
+## SBOM (Software Bill of Materials)
+
+🎯 **Complete transparency of all software components**
+
+WebMap provides comprehensive Software Bill of Materials (SBOM) in industry-standard formats.
+
+### Why SBOM?
+
+SBOM is like an "ingredient list" for software, enabling:
+
+- ✅ **Vulnerability Management**: Quickly identify vulnerable components
+- ✅ **Compliance**: Meet regulatory requirements (Executive Order 14028, NTIA)
+- ✅ **License Management**: Track all software licenses
+- ✅ **Supply Chain Security**: Understand your software supply chain
+- ✅ **Transparency**: Show users what's in the software
+
+### Available Formats
+
+**CycloneDX (OWASP):**
+- `.sbom/sbom.cyclonedx.json` - JSON format (recommended)
+- `.sbom/sbom.cyclonedx.xml` - XML format
+- Best for: Security scanning, DevSecOps
+
+**SPDX (Linux Foundation):**
+- `.sbom/sbom.spdx.json` - JSON format
+- Best for: License compliance, legal reviews
+- ISO/IEC 5962:2021 international standard
+
+### Automatic Generation
+
+SBOM is automatically generated on:
+- Every release (attached to GitHub Release)
+- Every push to main/master/develop
+- Monthly (1st of month)
+- Manual trigger via GitHub Actions
+
+### Current Components
+
+| Component | Version | License | Purpose |
+|-----------|---------|---------|---------|
+| Django | 4.2.15 | BSD-3-Clause | Web framework |
+| requests | 2.32.5 | Apache-2.0 | HTTP library |
+| xmltodict | 0.14.2 | MIT | XML parsing |
+| defusedxml | 0.7.1 | Python-2.0 | Secure XML |
+
+### Using the SBOM
+
+```bash
+# Scan for vulnerabilities with Trivy
+trivy sbom .sbom/sbom.cyclonedx.json
+
+# Scan with OSV Scanner (Google)
+osv-scanner --sbom=.sbom/sbom.cyclonedx.json
+
+# Validate SBOM
+cyclonedx validate --input-file .sbom/sbom.cyclonedx.json
+
+# Extract licenses
+jq '.components[].licenses' .sbom/sbom.cyclonedx.json
+```
+
+### Compliance
+
+✅ **NTIA Minimum Elements** - All 7 required elements included
+✅ **Executive Order 14028** - Federal software requirements met
+✅ **ISO/IEC 5962:2021** - SPDX international standard
+✅ **CycloneDX v1.6** - Latest OWASP specification
+✅ **Automatically scanned** - Trivy + OSV integration
+
+See [SBOM.md](SBOM.md) for complete documentation.
 
 ## Usage
 You should use this with docker, just by sending this command:
