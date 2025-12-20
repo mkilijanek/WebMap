@@ -83,7 +83,7 @@ jobs:
           jq -r '.components[] | "| \(.name) | \(.version) | \(.type) |"' .sbom/sbom.cyclonedx.json >> $GITHUB_STEP_SUMMARY
 
       - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: sbom-files
           path: |
@@ -152,7 +152,7 @@ jobs:
           ./osv-scanner --sbom=.sbom/sbom.cyclonedx.json --format=sarif --output=osv-sbom-results.sarif || true
 
       - name: Upload OSV scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: osv-sbom-scan
