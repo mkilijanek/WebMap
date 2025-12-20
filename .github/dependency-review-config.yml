@@ -2,15 +2,11 @@
 # https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/configuring-dependency-review
 
 # Fail the action if ANY of the following criteria are met
+# Severity levels: low, moderate, high, critical
 fail-on-severity: critical
 
-# Fail on CVSS score threshold (0-10)
-fail-on-cvss: 7.0
-
-# Fail on security advisories from GitHub Advisory Database
-fail-on-ghsa: true
-
 # Fail based on scope of dependencies
+# Scopes: runtime, development
 fail-on-scopes:
   - runtime
   - development
@@ -34,34 +30,20 @@ deny-licenses:
   - AGPL-3.0
   - CC-BY-NC-4.0  # Non-commercial license
 
-# Allow GPL licenses for dev dependencies only
-allow-dependencies-licenses:
-  - package-name: 'pytest'
-    licenses: ['MIT', 'GPL-3.0']  # If needed
+# Allow specific packages to use licenses that might otherwise be blocked
+# Format: PURL (Package URL) - pkg:ecosystem/package-name@version
+# Example: pkg:pypi/django@5.2.9
+allow-dependencies-licenses: []
 
-# Block specific packages
-deny-packages:
-  # Example: block known malicious packages
-  # - package-name: 'malicious-package'
-  #   reason: 'Known malware'
+# Block specific packages (PURL format)
+# Example: 'pkg:npm/lodash@4.17.0' blocks only version 4.17.0
+# Example: 'pkg:npm/lodash' blocks all versions
+deny-packages: []
 
-# Ignore specific advisories (use with caution!)
-# ignore-ghsas:
-#   - GHSA-xxxx-xxxx-xxxx  # Describe why ignored
+# Whitelist specific GitHub advisories (use with caution!)
+# Format: List of GitHub Advisory Database IDs from https://github.com/advisories
+# allow-ghsas:
+#   - GHSA-xxxx-xxxx-xxxx  # Describe why whitelisted
 
-# Severity levels: low, moderate, high, critical
-# Scopes: runtime, development
-# Package ecosystems: pip, npm, maven, nuget, etc.
-
-comments:
-  # Always comment on PRs with dependency review results
-  enabled: true
-
-  # Include summary in PR comments
-  include-summary: true
-
-  # Include vulnerability details
-  include-details: true
-
-  # Include license information
-  include-licenses: true
+# Note: Additional options like 'comment-summary-in-pr' should be set in the workflow file
+# Package ecosystems supported: pip, npm, maven, nuget, cargo, go, etc.
