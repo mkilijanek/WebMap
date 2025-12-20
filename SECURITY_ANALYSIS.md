@@ -19,6 +19,31 @@ This report details a comprehensive security analysis of the WebMap application.
 
 ---
 
+## 🔒 UPDATE (December 2025): Django SQL Injection Vulnerabilities Fixed
+
+**Date:** 2025-12-20
+
+Django has been upgraded from version **4.2.15** to **5.2.9 LTS** to address critical SQL injection vulnerabilities discovered in the framework:
+
+| CVE ID | Severity | Status | Description |
+|--------|----------|--------|-------------|
+| CVE-2025-64459 | 🔴 **CRITICAL** | ✅ **FIXED** | Django SQL injection vulnerability |
+| CVE-2024-53908 | 🟠 **HIGH** | ✅ **FIXED** | Potential SQL injection in HasKey(lhs, rhs) on Oracle |
+| CVE-2025-57833 | 🟠 **HIGH** | ✅ **FIXED** | Django SQL injection in FilteredRelation column aliases |
+| CVE-2025-59681 | 🟠 **HIGH** | ✅ **FIXED** | Potential SQL injection in QuerySet.annotate(), alias(), aggregate(), and extra() on MySQL/MariaDB |
+
+**Impact:** These vulnerabilities could allow attackers to execute arbitrary SQL queries, potentially leading to:
+- Data exfiltration from the database
+- Data modification or deletion
+- Authentication bypass
+- Privilege escalation
+
+**Mitigation:** Django 5.2.9 LTS provides security updates until **April 2028**.
+
+**Details:** See `DJANGO_UPDATE.md` for complete upgrade documentation.
+
+---
+
 ## Vulnerability Summary
 
 | Severity | Count | Description |

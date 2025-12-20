@@ -117,7 +117,7 @@ SBOM is automatically generated on:
 
 | Component | Version | License | Purpose |
 |-----------|---------|---------|---------|
-| Django | 4.2.15 | BSD-3-Clause | Web framework |
+| Django | 5.2.9 | BSD-3-Clause | Web framework (LTS) |
 | requests | 2.32.5 | Apache-2.0 | HTTP library |
 | xmltodict | 0.14.2 | MIT | XML parsing |
 | defusedxml | 0.7.1 | Python-2.0 | Secure XML |

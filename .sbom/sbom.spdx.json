@@ -5,7 +5,7 @@
   "name": "WebMap-2.0",
   "documentNamespace": "https://github.com/mkilijanek/WebMap/sbom/spdx-2.3-2025-12-20",
   "creationInfo": {
-    "created": "2025-12-20T00:00:00Z",
+    "created": "2025-12-20T12:00:00Z",
     "creators": [
       "Tool: spdx-tools",
       "Organization: WebMap Project",
@@ -37,24 +37,24 @@
     {
       "SPDXID": "SPDXRef-Package-Django",
       "name": "Django",
-      "versionInfo": "4.2.15",
-      "downloadLocation": "https://pypi.org/project/Django/4.2.15/",
+      "versionInfo": "5.2.9",
+      "downloadLocation": "https://pypi.org/project/Django/5.2.9/",
       "filesAnalyzed": false,
       "homepage": "https://www.djangoproject.com/",
       "licenseConcluded": "BSD-3-Clause",
       "licenseDeclared": "BSD-3-Clause",
       "copyrightText": "Copyright Django Software Foundation and individual contributors",
-      "description": "A high-level Python Web framework that encourages rapid development and clean, pragmatic design.",
+      "description": "A high-level Python Web framework that encourages rapid development and clean, pragmatic design. LTS version with security updates until April 2028.",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
-          "referenceLocator": "pkg:pypi/django@4.2.15"
+          "referenceLocator": "pkg:pypi/django@5.2.9"
         },
         {
           "referenceCategory": "SECURITY",
           "referenceType": "cpe23Type",
-          "referenceLocator": "cpe:2.3:a:djangoproject:django:4.2.15:*:*:*:*:*:*:*"
+          "referenceLocator": "cpe:2.3:a:djangoproject:django:5.2.9:*:*:*:lts:*:*:*"
         }
       ]
     },

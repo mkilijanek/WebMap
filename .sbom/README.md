@@ -76,7 +76,7 @@ Current SBOM includes:
 
 ### Direct Dependencies
 
-- **Django** v4.2.15 - Web framework
+- **Django** v5.2.9 - Web framework (LTS, supported until April 2028)
 - **requests** v2.32.5 - HTTP library
 - **xmltodict** v0.14.2 - XML parsing
 - **defusedxml** v0.7.1 - Secure XML parsing

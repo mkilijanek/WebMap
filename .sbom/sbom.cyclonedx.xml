@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
-<bom xmlns="http://cyclonedx.org/schema/bom/1.6" serialNumber="urn:uuid:182cb68e-b1f0-4fd4-9bab-3563b82b5a06" version="1">
+<bom xmlns="http://cyclonedx.org/schema/bom/1.6" serialNumber="urn:uuid:36154ca8-ab5c-414d-85fe-be44784d141a" version="1">
   <metadata>
-    <timestamp>2025-12-20T18:43:57.368080+00:00</timestamp>
+    <timestamp>2025-12-20T18:59:47.259370+00:00</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -84,9 +84,9 @@
   <components>
     <component type="library" bom-ref="requirements-L6">
       <name>Django</name>
-      <version>4.2.15</version>
-      <description>requirements line 6: Django==4.2.15</description>
-      <purl>pkg:pypi/django@4.2.15</purl>
+      <version>5.2.9</version>
+      <description>requirements line 6: Django==5.2.9</description>
+      <purl>pkg:pypi/django@5.2.9</purl>
       <externalReferences>
         <reference type="distribution">
           <url>https://pypi.org/simple/Django/</url>

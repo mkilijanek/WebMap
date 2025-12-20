@@ -59,11 +59,19 @@ This document outlines the security improvements implemented in WebMap and provi
 9. **Dependency Security (CVE-012)**
    - All dependencies pinned to specific versions
    - Updated to latest secure versions:
-     - Django 4.2.15 (LTS)
+     - Django 5.2.9 (LTS, 2025-2028) - **Fixed 4 SQL injection CVEs**
      - requests 2.32.5
      - xmltodict 0.14.2
      - Added defusedxml 0.7.1
    - File: `requirements.txt`
+
+10. **Django SQL Injection Fixes (December 2025)** ✅
+   - Upgraded Django from 4.2.15 to 5.2.9 LTS
+   - Fixed CVE-2025-64459 (CRITICAL) - Django SQL injection
+   - Fixed CVE-2024-53908 (HIGH) - SQL injection in HasKey(lhs, rhs) on Oracle
+   - Fixed CVE-2025-57833 (HIGH) - SQL injection in FilteredRelation column aliases
+   - Fixed CVE-2025-59681 (HIGH) - SQL injection in QuerySet operations on MySQL/MariaDB
+   - See: `DJANGO_UPDATE.md` for details
 
 ---
 

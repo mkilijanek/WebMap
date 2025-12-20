@@ -117,7 +117,8 @@ TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
-USE_L10N = True
+# USE_L10N removed in Django 5.0 - localized formatting is always enabled
+# USE_L10N = True
 
 USE_TZ = True
 
@@ -131,7 +132,7 @@ STATIC_URL = '/static/'
 # https://docs.djangoproject.com/en/stable/topics/security/
 
 # Security headers
-SECURE_BROWSER_XSS_FILTER = True
+# SECURE_BROWSER_XSS_FILTER removed in Django 4.0 - X-XSS-Protection header deprecated by browsers
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'same-origin'
