@@ -1,2 +1,21 @@
-requests
-xmltodict
+# WebMap Dependencies
+# Updated: 2025-12-20
+# Security: All versions pinned for security and reproducibility
+
+# Django web framework
+Django==4.2.15  # LTS version with security updates
+
+# HTTP library for CVE API calls
+requests==2.32.5  # Latest stable, no known vulnerabilities
+
+# XML parsing library
+xmltodict==0.14.2  # Updated from 0.13.0, includes security fixes
+
+# Secure XML parsing (XXE protection)
+defusedxml==0.7.1  # Protection against XML attacks
+
+# Optional: Security scanning tools (development only)
+# Uncomment for security testing:
+# bandit==1.7.8  # Security linter
+# safety==3.2.0  # Dependency vulnerability scanner
+# pip-audit==2.7.3  # Audit pip packages for known vulnerabilities

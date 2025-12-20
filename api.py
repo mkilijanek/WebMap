@@ -1,73 +1,154 @@
 from django.shortcuts import render
 from django.http import HttpResponse
-import xmltodict, json, html, os, hashlib, re, requests
+from django.core.exceptions import SuspiciousFileOperation, ValidationError
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.http import require_http_methods
+import xmltodict, json, html, os, hashlib, re, requests, subprocess
 from collections import OrderedDict
+from security_utils import (
+    safe_join, validate_filename, validate_md5_hash,
+    validate_port_number, validate_cpe_string
+)
 
 def rmNotes(request, hashstr):
-	scanfilemd5 = hashlib.md5(str(request.session['scanfile']).encode('utf-8')).hexdigest()
-	if re.match('^[a-f0-9]{32,32}$', hashstr) is not None:
-		os.remove('/opt/notes/'+scanfilemd5+'_'+hashstr+'.notes')
-		res = {'ok':'notes removed'}
-	else:
-		res = {'error':'invalid format'}
+	try:
+		# Validate inputs
+		scanfile = validate_filename(request.session.get('scanfile', ''))
+		scanfilemd5 = hashlib.md5(scanfile.encode('utf-8')).hexdigest()
+		hashstr = validate_md5_hash(hashstr)
+
+		# Safe file path construction
+		notes_dir = '/opt/notes'
+		filename = f'{scanfilemd5}_{hashstr}.notes'
+		filepath = safe_join(notes_dir, filename)
+
+		# Check file exists before removing
+		if os.path.exists(filepath):
+			os.remove(filepath)
+			res = {'ok': 'notes removed'}
+		else:
+			res = {'error': 'file not found'}
+
+	except (ValidationError, SuspiciousFileOperation) as e:
+		res = {'error': str(e)}
+	except Exception as e:
+		res = {'error': 'operation failed'}
 
 	return HttpResponse(json.dumps(res), content_type="application/json")
 
+@csrf_protect
+@require_http_methods(['POST'])
 def saveNotes(request):
-	if request.method == "POST":
-		scanfilemd5 = hashlib.md5(str(request.session['scanfile']).encode('utf-8')).hexdigest()
+	try:
+		# Validate inputs
+		scanfile = validate_filename(request.session.get('scanfile', ''))
+		scanfilemd5 = hashlib.md5(scanfile.encode('utf-8')).hexdigest()
+		hashstr = validate_md5_hash(request.POST.get('hashstr', ''))
 
-		if re.match('^[a-f0-9]{32,32}$', request.POST['hashstr']) is not None:
-			f = open('/opt/notes/'+scanfilemd5+'_'+request.POST['hashstr']+'.notes', 'w')
-			f.write(request.POST['notes'])
-			f.close()
-			res = {'ok':'notes saved'}
-	else:
-		res = {'error': request.method }
+		# Validate notes content (max 10KB)
+		notes_content = request.POST.get('notes', '')
+		if len(notes_content) > 10240:
+			raise ValidationError('Notes content too large (max 10KB)')
+
+		# Safe file path construction
+		notes_dir = '/opt/notes'
+		filename = f'{scanfilemd5}_{hashstr}.notes'
+		filepath = safe_join(notes_dir, filename)
+
+		# Write notes securely
+		with open(filepath, 'w', encoding='utf-8') as f:
+			f.write(notes_content)
+
+		res = {'ok': 'notes saved'}
+
+	except (ValidationError, SuspiciousFileOperation) as e:
+		res = {'error': str(e)}
+	except Exception as e:
+		res = {'error': 'operation failed'}
 
 	return HttpResponse(json.dumps(res), content_type="application/json")
 
 def rmlabel(request, objtype, hashstr):
-	types = {
-		'host':True,
-		'port':True
-	}
+	try:
+		# Validate inputs
+		from security_utils import validate_object_type
+		objtype = validate_object_type(objtype)
+		scanfile = validate_filename(request.session.get('scanfile', ''))
+		scanfilemd5 = hashlib.md5(scanfile.encode('utf-8')).hexdigest()
+		hashstr = validate_md5_hash(hashstr)
 
-	scanfilemd5 = hashlib.md5(str(request.session['scanfile']).encode('utf-8')).hexdigest()
+		# Safe file path construction
+		notes_dir = '/opt/notes'
+		filename = f'{scanfilemd5}_{hashstr}.{objtype}.label'
+		filepath = safe_join(notes_dir, filename)
 
-	if re.match('^[a-f0-9]{32,32}$', hashstr) is not None:
-		os.remove('/opt/notes/'+scanfilemd5+'_'+hashstr+'.'+objtype+'.label')
-		res = {'ok':'label removed'}
-		return HttpResponse(json.dumps(res), content_type="application/json")
+		# Check file exists before removing
+		if os.path.exists(filepath):
+			os.remove(filepath)
+			res = {'ok': 'label removed'}
+		else:
+			res = {'error': 'file not found'}
+
+	except (ValidationError, SuspiciousFileOperation) as e:
+		res = {'error': str(e)}
+	except Exception as e:
+		res = {'error': 'operation failed'}
+
+	return HttpResponse(json.dumps(res), content_type="application/json")
 
 def label(request, objtype, label, hashstr):
-	labels = {
-		'Vulnerable':True,
-		'Critical':True,
-		'Warning':True,
-		'Checked':True
-	}
+	try:
+		# Validate inputs
+		from security_utils import validate_label, validate_object_type
+		label = validate_label(label)
+		objtype = validate_object_type(objtype)
+		scanfile = validate_filename(request.session.get('scanfile', ''))
+		scanfilemd5 = hashlib.md5(scanfile.encode('utf-8')).hexdigest()
+		hashstr = validate_md5_hash(hashstr)
 
-	types = {
-		'host':True,
-		'port':True
-	}
+		# Safe file path construction
+		notes_dir = '/opt/notes'
+		filename = f'{scanfilemd5}_{hashstr}.{objtype}.label'
+		filepath = safe_join(notes_dir, filename)
 
-	scanfilemd5 = hashlib.md5(str(request.session['scanfile']).encode('utf-8')).hexdigest()
-
-	if label in labels and objtype in types:
-		if re.match('^[a-f0-9]{32,32}$', hashstr) is not None:
-			f = open('/opt/notes/'+scanfilemd5+'_'+hashstr+'.'+objtype+'.label', 'w')
+		# Write label securely
+		with open(filepath, 'w', encoding='utf-8') as f:
 			f.write(label)
-			f.close()
-			res = {'ok':'label set', 'label':str(label)}
-			return HttpResponse(json.dumps(res), content_type="application/json")
+
+		res = {'ok': 'label set', 'label': label}
+
+	except (ValidationError, SuspiciousFileOperation) as e:
+		res = {'error': str(e)}
+	except Exception as e:
+		res = {'error': 'operation failed'}
+
+	return HttpResponse(json.dumps(res), content_type="application/json")
 
 def port_details(request, address, portid):
+	try:
+		# Validate inputs
+		from security_utils import validate_ip_address
+		address = validate_ip_address(address)
+		portid = str(validate_port_number(portid))
+		scanfile = validate_filename(request.session.get('scanfile', ''))
+
+		# Safe file path construction
+		xml_dir = '/opt/xml'
+		filepath = safe_join(xml_dir, scanfile)
+
+		# Parse XML securely (XXE protection via xmltodict defaults)
+		with open(filepath, 'r', encoding='utf-8') as f:
+			xml_content = f.read()
+
+		oo = xmltodict.parse(xml_content, disable_entities=True)
+		o = oo['nmaprun']
+	except (ValidationError, SuspiciousFileOperation) as e:
+		return HttpResponse(json.dumps({'error': str(e)}), content_type="application/json", status=400)
+	except Exception as e:
+		return HttpResponse(json.dumps({'error': 'operation failed'}), content_type="application/json", status=500)
+
 	r = {}
-	oo = xmltodict.parse(open('/opt/xml/'+request.session['scanfile'], 'r').read())
-	r['out'] = json.dumps(oo['nmaprun'], indent=4)
-	o = json.loads(r['out'])
+	r['out'] = json.dumps(o, indent=4)
 
 	for ik in o['host']:
 
@@ -95,35 +176,102 @@ def port_details(request, address, portid):
 					return HttpResponse(json.dumps(p, indent=4), content_type="application/json")
 
 def genPDF(request):
-	if 'scanfile' in request.session:
-		pdffile = hashlib.md5(str(request.session['scanfile']).encode('utf-8')).hexdigest()
-		if os.path.exists('/opt/nmapdashboard/nmapreport/static/'+pdffile+'.pdf'):
-			os.remove('/opt/nmapdashboard/nmapreport/static/'+pdffile+'.pdf')
+	try:
+		if 'scanfile' not in request.session:
+			raise ValidationError('No scan file selected')
 
-		os.popen('/opt/wkhtmltox/bin/wkhtmltopdf --cookie sessionid '+request.session._session_key+' --enable-javascript --javascript-delay 6000 http://127.0.0.1:8000/view/pdf/ /opt/nmapdashboard/nmapreport/static/'+pdffile+'.pdf')
-		res = {'ok':'PDF created', 'file':'/static/'+pdffile+'.pdf'}
-		return HttpResponse(json.dumps(res), content_type="application/json")
+		# Validate scanfile
+		scanfile = validate_filename(request.session['scanfile'])
+		pdffile = hashlib.md5(scanfile.encode('utf-8')).hexdigest()
 
+		# Safe PDF path construction
+		static_dir = '/opt/nmapdashboard/nmapreport/static'
+		pdf_filename = f'{pdffile}.pdf'
+		pdf_path = safe_join(static_dir, pdf_filename)
+
+		# Remove existing PDF if present
+		if os.path.exists(pdf_path):
+			os.remove(pdf_path)
+
+		# CRITICAL FIX: Use subprocess instead of os.popen to prevent command injection
+		# Build command as list to avoid shell interpretation
+		cmd = [
+			'/opt/wkhtmltox/bin/wkhtmltopdf',
+			'--cookie', 'sessionid', request.session._session_key,
+			'--enable-javascript',
+			'--javascript-delay', '6000',
+			'http://127.0.0.1:8000/view/pdf/',
+			pdf_path
+		]
+
+		# Execute command safely without shell
+		result = subprocess.run(
+			cmd,
+			shell=False,  # Critical: Never use shell=True with user input
+			check=True,
+			timeout=30,  # Prevent indefinite execution
+			capture_output=True,
+			text=True
+		)
+
+		res = {'ok': 'PDF created', 'file': f'/static/{pdf_filename}'}
+
+	except ValidationError as e:
+		res = {'error': str(e)}
+	except subprocess.TimeoutExpired:
+		res = {'error': 'PDF generation timeout'}
+	except subprocess.CalledProcessError as e:
+		res = {'error': 'PDF generation failed'}
+	except Exception as e:
+		res = {'error': 'operation failed'}
+
+	return HttpResponse(json.dumps(res), content_type="application/json")
+
+@csrf_protect
+@require_http_methods(['POST'])
 def getCVE(request):
-	res = {}
+	try:
+		# Validate inputs
+		from security_utils import validate_ip_address
+		scanfile = validate_filename(request.session.get('scanfile', ''))
+		scanfilemd5 = hashlib.md5(scanfile.encode('utf-8')).hexdigest()
 
-	if request.method == "POST":
-		scanfilemd5 = hashlib.md5(str(request.session['scanfile']).encode('utf-8')).hexdigest()
-		hostmd5 = hashlib.md5(str(request.POST['host']).encode('utf-8')).hexdigest()
-		portmd5 = hashlib.md5(str(request.POST['port']).encode('utf-8')).hexdigest()
+		host = validate_ip_address(request.POST.get('host', ''))
+		hostmd5 = hashlib.md5(host.encode('utf-8')).hexdigest()
 
-		# request.POST['host']
-		r = requests.get('http://cve.circl.lu/api/cvefor/'+request.POST['cpe'])
+		port = str(validate_port_number(request.POST.get('port', '')))
+		cpe = validate_cpe_string(request.POST.get('cpe', ''))
 
-		if request.POST['host'] not in res:
-			res[request.POST['host']] = {}
+		# Make external API call with timeout and error handling
+		try:
+			r = requests.get(
+				f'http://cve.circl.lu/api/cvefor/{cpe}',
+				timeout=10,  # 10 second timeout
+				headers={'User-Agent': 'WebMap/1.0'}
+			)
+			r.raise_for_status()
+			cvejson = r.json()
+		except requests.RequestException as e:
+			raise ValidationError('Failed to fetch CVE data from external API')
 
-		cvejson = r.json()
+		res = {}
+		if isinstance(cvejson, list) and len(cvejson) > 0:
+			res[host] = {port: cvejson[0]}
 
-		if type(cvejson) is list and len(cvejson) > 0:
-			res[request.POST['host']][request.POST['port']] = cvejson[0]
-			f = open('/opt/notes/'+scanfilemd5+'_'+hostmd5+'.'+request.POST['port']+'.cve', 'w')
-			f.write(json.dumps(cvejson))
-			f.close()
+			# Safe file path construction
+			notes_dir = '/opt/notes'
+			filename = f'{scanfilemd5}_{hostmd5}.{port}.cve'
+			filepath = safe_join(notes_dir, filename)
 
-		return HttpResponse(json.dumps(res), content_type="application/json")
+			# Write CVE data
+			with open(filepath, 'w', encoding='utf-8') as f:
+				f.write(json.dumps(cvejson))
+		else:
+			res = {'info': 'No CVE data found'}
+
+	except (ValidationError, SuspiciousFileOperation) as e:
+		res = {'error': str(e)}
+	except Exception as e:
+		res = {'error': 'operation failed'}
+
+	return HttpResponse(json.dumps(res), content_type="application/json")

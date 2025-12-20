@@ -1,4 +1,5 @@
 import os
+import secrets
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -7,18 +8,32 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'rev3rse-notes:_you_should-change_this..._but_webmap_should_run_on_localhost_only..._so_no_problem_here.'
-#             ^^^ -> yes, not safe for production. This is the why you shouldn't expose this app on the internet.
+# SECURITY FIX: Use environment variable for SECRET_KEY
+# Generate a new key with: python -c "import secrets; print(secrets.token_urlsafe(50))"
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    # For development only - generate random key
+    # In production, ALWAYS set DJANGO_SECRET_KEY environment variable
+    import warnings
+    warnings.warn(
+        'DJANGO_SECRET_KEY not set in environment. Using auto-generated key. '
+        'This is INSECURE for production! Set DJANGO_SECRET_KEY environment variable.',
+        RuntimeWarning
+    )
+    SECRET_KEY = secrets.token_urlsafe(50)
 
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-#       ^^^ leave it active for better understand issues and bug
-#       ^^^ (again, this is a good reason to not expose this app on the internet)
+# SECURITY FIX: Make DEBUG configurable via environment variable
+# Set DEBUG=False for production
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = ['*']
-#               ^ keep in mind that this app is not designed to be exposed on the internet. Please don't do it.
+# SECURITY FIX: Restrict allowed hosts
+# Set ALLOWED_HOSTS environment variable in production
+# Default to localhost only for security
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1]').split(',')
+
+# SECURITY WARNING: This app is designed for localhost use only
+# DO NOT expose this application to the internet without proper security review
 
 # Application definition
 
@@ -111,3 +126,42 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
 STATIC_URL = '/static/'
+
+# Security Settings
+# https://docs.djangoproject.com/en/stable/topics/security/
+
+# Security headers
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'same-origin'
+
+# Session security
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Strict'
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_AGE = 3600  # 1 hour
+
+# CSRF protection
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Strict'
+
+# If using HTTPS (recommended for production):
+# SECURE_SSL_REDIRECT = True
+# SESSION_COOKIE_SECURE = True
+# CSRF_COOKIE_SECURE = True
+# SECURE_HSTS_SECONDS = 31536000
+# SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+# SECURE_HSTS_PRELOAD = True
+
+# File upload limits
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
+
+# Content Security Policy (basic)
+# For production, consider using django-csp package
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "https://www.google.com", "https://apis.google.com")
+CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
+CSP_IMG_SRC = ("'self'", "data:")
+CSP_FONT_SRC = ("'self'",)
