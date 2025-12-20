@@ -1,0 +1,67 @@
+# Dependency Review Configuration
+# https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/configuring-dependency-review
+
+# Fail the action if ANY of the following criteria are met
+fail-on-severity: critical
+
+# Fail on CVSS score threshold (0-10)
+fail-on-cvss: 7.0
+
+# Fail on security advisories from GitHub Advisory Database
+fail-on-ghsa: true
+
+# Fail based on scope of dependencies
+fail-on-scopes:
+  - runtime
+  - development
+
+# License configuration
+allow-licenses:
+  - MIT
+  - Apache-2.0
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - ISC
+  - Python-2.0
+  - PSF-2.0  # Python Software Foundation
+
+deny-licenses:
+  - GPL-2.0
+  - GPL-3.0
+  - LGPL-2.0
+  - LGPL-2.1
+  - LGPL-3.0
+  - AGPL-3.0
+  - CC-BY-NC-4.0  # Non-commercial license
+
+# Allow GPL licenses for dev dependencies only
+allow-dependencies-licenses:
+  - package-name: 'pytest'
+    licenses: ['MIT', 'GPL-3.0']  # If needed
+
+# Block specific packages
+deny-packages:
+  # Example: block known malicious packages
+  # - package-name: 'malicious-package'
+  #   reason: 'Known malware'
+
+# Ignore specific advisories (use with caution!)
+# ignore-ghsas:
+#   - GHSA-xxxx-xxxx-xxxx  # Describe why ignored
+
+# Severity levels: low, moderate, high, critical
+# Scopes: runtime, development
+# Package ecosystems: pip, npm, maven, nuget, etc.
+
+comments:
+  # Always comment on PRs with dependency review results
+  enabled: true
+
+  # Include summary in PR comments
+  include-summary: true
+
+  # Include vulnerability details
+  include-details: true
+
+  # Include license information
+  include-licenses: true

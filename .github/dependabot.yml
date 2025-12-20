@@ -1,0 +1,91 @@
+# GitHub Dependabot Configuration
+# Automatically checks for dependency updates and security vulnerabilities
+# https://docs.github.com/en/code-security/dependabot
+
+version: 2
+
+updates:
+  # Python dependencies (pip)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "03:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+
+    # Reviewers for dependency PRs
+    reviewers:
+      - "mkilijanek"
+
+    # Labels for dependency PRs
+    labels:
+      - "dependencies"
+      - "security"
+      - "automated"
+
+    # Commit message prefix
+    commit-message:
+      prefix: "⬆️ deps"
+      prefix-development: "⬆️ deps-dev"
+      include: "scope"
+
+    # Version update strategy
+    versioning-strategy: increase
+
+    # Allow both direct and indirect dependencies
+    allow:
+      - dependency-type: "all"
+
+    # Ignore specific dependencies (if needed)
+    # ignore:
+    #   - dependency-name: "requests"
+    #     versions: ["2.x"]
+
+    # Auto-merge security updates (requires GitHub Actions workflow)
+    # See: .github/workflows/dependabot-auto-merge.yml
+
+  # Docker dependencies
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+      - "automated"
+    commit-message:
+      prefix: "🐳 docker"
+
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "automated"
+    commit-message:
+      prefix: "⚙️ ci"
+
+# Security updates are prioritized automatically by Dependabot
+# Vulnerabilities are checked against:
+# - GitHub Advisory Database
+# - National Vulnerability Database (NVD)
+# - npm Security advisories
+# - PyPI Advisory Database
+
+# Configuration for Dependabot security updates:
+# - CRITICAL: Opened immediately
+# - HIGH: Opened within 24 hours
+# - MEDIUM: Opened within 7 days
+# - LOW: Opened within 30 days
