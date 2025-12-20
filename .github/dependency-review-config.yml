@@ -1,0 +1,49 @@
+# Dependency Review Configuration
+# https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/configuring-dependency-review
+
+# Fail the action if ANY of the following criteria are met
+# Severity levels: low, moderate, high, critical
+fail-on-severity: critical
+
+# Fail based on scope of dependencies
+# Scopes: runtime, development
+fail-on-scopes:
+  - runtime
+  - development
+
+# License configuration
+allow-licenses:
+  - MIT
+  - Apache-2.0
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - ISC
+  - Python-2.0
+  - PSF-2.0  # Python Software Foundation
+
+deny-licenses:
+  - GPL-2.0
+  - GPL-3.0
+  - LGPL-2.0
+  - LGPL-2.1
+  - LGPL-3.0
+  - AGPL-3.0
+  - CC-BY-NC-4.0  # Non-commercial license
+
+# Allow specific packages to use licenses that might otherwise be blocked
+# Format: PURL (Package URL) - pkg:ecosystem/package-name@version
+# Example: pkg:pypi/django@5.2.9
+allow-dependencies-licenses: []
+
+# Block specific packages (PURL format)
+# Example: 'pkg:npm/lodash@4.17.0' blocks only version 4.17.0
+# Example: 'pkg:npm/lodash' blocks all versions
+deny-packages: []
+
+# Whitelist specific GitHub advisories (use with caution!)
+# Format: List of GitHub Advisory Database IDs from https://github.com/advisories
+# allow-ghsas:
+#   - GHSA-xxxx-xxxx-xxxx  # Describe why whitelisted
+
+# Note: Additional options like 'comment-summary-in-pr' should be set in the workflow file
+# Package ecosystems supported: pip, npm, maven, nuget, cargo, go, etc.
