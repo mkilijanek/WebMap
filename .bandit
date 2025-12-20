@@ -1,0 +1,65 @@
+# Bandit Configuration
+# Python security linter configuration
+# https://bandit.readthedocs.io/
+
+[bandit]
+# Exclude paths
+exclude_dirs = [
+    '.git',
+    '.github',
+    'venv',
+    'env',
+    '.venv',
+    'node_modules',
+    '__pycache__',
+    'migrations',
+    'static',
+    'media',
+    'tests',
+    '.pytest_cache',
+    '.tox'
+]
+
+# Tests to run
+# tests = []  # Run all tests by default
+
+# Tests to skip
+# B101: Test for use of assert
+# B404: Consider possible security implications associated with subprocess module
+# B603: subprocess without shell equals true (we use shell=False which is safe)
+skips = ['B101', 'B404', 'B603']
+
+# Severity level: low, medium, high
+severity = medium
+
+# Confidence level: low, medium, high
+confidence = medium
+
+# Recursively scan subdirectories
+recursive = true
+
+# Number of lines of context to show
+context_lines = 3
+
+# Output format: txt, json, csv, xml, html, yaml
+# format = json
+
+# Plugins to load
+# plugins = []
+
+# Specific tests configuration
+[bandit.plugins]
+# B201: Flask debug mode
+# B601-B609: Shell injection vulnerabilities
+# B301-B324: Pickle, shelve, yaml.load issues
+# B501-B507: SSL/TLS issues
+# B601: Paramiko calls
+# B701-B703: Jinja2 autoescape issues
+
+# Custom blacklist/whitelist
+# [bandit.blacklist]
+# calls = []
+# imports = []
+
+# Baseline file (if you want to ignore existing issues)
+# baseline = .bandit_baseline.json

@@ -36,6 +36,8 @@ h1 {
 	padding:10px;
 	margin-bottom:10px;
 	font-family:monospace;
+	border-radius:4px;
+	background-color:#eee;
 }
 
 .extratitle {

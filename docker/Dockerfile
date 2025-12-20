@@ -29,7 +29,7 @@ RUN mkdir /opt/xml && mkdir /opt/notes && \
 RUN pip3 install Django requests xmltodict && \
     cd /opt/ && django-admin startproject nmapdashboard && cd /opt/nmapdashboard && \
     git clone https://github.com/Rev3rseSecurity/WebMap.git && \
-    mv WebMap nmapreport && rm -rf settings.py urls.py
+    mv WebMap nmapreport && cd nmapreport && git checkout v2/master
 
 COPY settings.py /opt/nmapdashboard/nmapdashboard/
 COPY urls.py /opt/nmapdashboard/nmapdashboard/
