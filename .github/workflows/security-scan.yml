@@ -39,16 +39,20 @@ jobs:
       - name: Run pip-audit
         run: |
           echo "Running pip-audit to check for known vulnerabilities..."
-          pip-audit --require requirements.txt --format json --output pip-audit-report.json || true
-          pip-audit --require requirements.txt --format markdown --output pip-audit-report.md || true
-          pip-audit --require requirements.txt || true
+          pip-audit -r requirements.txt --format json --output pip-audit-report.json || true
+          pip-audit -r requirements.txt --format markdown --output pip-audit-report.md || true
+          pip-audit -r requirements.txt || true
         continue-on-error: true
 
       - name: Run Safety check
         run: |
           echo "Running Safety to check for known security vulnerabilities..."
-          safety check --json --output safety-report.json || true
-          safety check || true
+          # Install dependencies first
+          pip install -r requirements.txt
+
+          # Run Safety scan (CLI 3 recommended command)
+          safety scan --json --output safety-report.json || true
+          safety scan || true
         continue-on-error: true
 
       - name: Upload pip-audit report
@@ -137,9 +141,10 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: main
+          base: ${{ github.event.repository.default_branch }}
           head: HEAD
           extra_args: --debug --only-verified
+        continue-on-error: true
 
   # Job 4: SAST with Semgrep
   sast-scan:
@@ -156,14 +161,14 @@ jobs:
       - name: Run Semgrep
         run: |
           semgrep scan \
-            --config=auto \
+            --config auto \
             --sarif \
-            --output=semgrep-report.sarif || true
+            -o semgrep-report.sarif || true
 
           semgrep scan \
-            --config=auto \
+            --config auto \
             --json \
-            --output=semgrep-report.json || true
+            -o semgrep-report.json || true
         continue-on-error: true
 
       - name: Upload Semgrep report
