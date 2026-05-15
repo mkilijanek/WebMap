@@ -9,7 +9,7 @@ Django==5.2.9  # LTS version (2025-2028), fixes CVE-2025-64459, CVE-2024-53908, 
 requests==2.34.2  # Latest stable, no known vulnerabilities
 
 # XML parsing library
-xmltodict==0.14.2  # Updated from 0.13.0, includes security fixes
+xmltodict==1.0.4  # Updated from 0.13.0, includes security fixes
 
 # Secure XML parsing (XXE protection)
 defusedxml==0.7.1  # Protection against XML attacks
