@@ -3,7 +3,7 @@
 # Security: All versions pinned for security and reproducibility
 
 # Django web framework
-Django==5.2.9  # LTS version (2025-2028), fixes CVE-2025-64459, CVE-2024-53908, CVE-2025-57833, CVE-2025-59681
+Django==6.1  # LTS version (2025-2028), fixes CVE-2025-64459, CVE-2024-53908, CVE-2025-57833, CVE-2025-59681
 
 # HTTP library for CVE API calls
 requests==2.34.2  # Latest stable, no known vulnerabilities
