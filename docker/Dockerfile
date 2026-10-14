@@ -8,14 +8,16 @@
 #   $ docker run -d --name webmap -p 127.0.0.1:8000:8000 \
 #       -e DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" \
 #       -e WEBMAP_USER=webmap -e WEBMAP_PASSWORD='<choose a strong password>' \
-#       -v /tmp/webmap:/opt/xml webmap:local
+#       -v /tmp/webmap:/opt/xml:ro -v webmap-notes:/opt/notes webmap:local
 #
 # Nmap Example:
 #   $ nmap -sT -A -oX /tmp/webmap/myscan.xml 192.168.1.0/24
 #
 # Now you can point your browser to http://localhost:8000 and log in with
 # WEBMAP_USER / WEBMAP_PASSWORD (or WEBMAP_PASSWORD_FILE for a Docker secret).
-# Keep it bound to localhost or put it behind TLS: there is no HTTPS here.
+# Keep it bound to localhost or put it behind a TLS reverse proxy: there is
+# no HTTPS here. All settings: docs/configuration.md; remote access and
+# hardening: docs/deployment.md.
 
 FROM python:3.12-slim-bookworm
 

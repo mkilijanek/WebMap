@@ -1,6 +1,6 @@
 <p align="center">
-<img width="300" src="https://i.imgur.com/puyIfHT.jpg" /><br>
-A Web Dashbord for Nmap XML Report
+<img width="300" src="https://i.imgur.com/puyIfHT.jpg" alt="WebMap" /><br>
+A web dashboard for Nmap XML reports
 </p>
 
 <p align="center">
@@ -10,322 +10,197 @@ A Web Dashbord for Nmap XML Report
   <a href="https://github.com/mkilijanek/WebMap/actions/workflows/codeql-analysis.yml">
     <img src="https://github.com/mkilijanek/WebMap/actions/workflows/codeql-analysis.yml/badge.svg" alt="CodeQL">
   </a>
-  <a href="https://github.com/mkilijanek/WebMap/security/policy">
+  <a href="SECURITY.md">
     <img src="https://img.shields.io/badge/security-policy-blue.svg" alt="Security Policy">
   </a>
-  <a href="https://github.com/mkilijanek/WebMap/security/dependabot">
-    <img src="https://img.shields.io/badge/dependabot-enabled-success.svg" alt="Dependabot">
-  </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License">
+    <img src="https://img.shields.io/badge/license-GPL--3.0-blue.svg" alt="License: GPL-3.0">
   </a>
 </p>
 
-> **⚠️ SECURITY NOTICE**: This application is designed for **LOCAL USE ONLY**. Do NOT expose to the internet without proper security hardening. See [SECURITY.md](SECURITY.md) for details.
+> **Scope:** WebMap is built for one analyst on `localhost` or a trusted
+> internal network. Scan results are sensitive; do not expose an instance to
+> the internet. See [SECURITY.md](SECURITY.md).
+
+WebMap reads the XML files Nmap writes (`nmap -oX`) and shows them as a
+browsable dashboard: hosts, ports, services, charts, per-host notes and
+labels, CVE lookups for the CPEs Nmap reports, and a PDF report.
+
+This repository (`mkilijanek/WebMap`, default branch `v2/master`) is a
+security-hardened fork of [Rev3rseSecurity/WebMap](https://github.com/Rev3rseSecurity/WebMap).
 
 ![WebMap](https://i.imgur.com/U9S089v.png)
 
-![WebMap](https://i.imgur.com/Ptijc67.png)
+## Contents
 
-![WebMap](https://i.imgur.com/alWZix9.png)
-
-## Table Of Contents
-- [Security](#security)
-- [SBOM (Software Bill of Materials)](#sbom-software-bill-of-materials)
-- [Usage](#usage)
-- [Video](#video)
+- [Quick start](#quick-start)
 - [Features](#features)
-- [XML Filenames](#xml-filenames)
-- [CVE and Exploits](#cve-and-exploits)
-- [Third Parts](#third-parts)
-- [Security Issues](#security-issues)
-- [Security Automation](#security-automation)
+- [Configuration](#configuration)
+- [Security](#security)
+- [Documentation](#documentation)
+- [XML file names](#xml-file-names)
+- [CVE and exploits](#cve-and-exploits)
+- [Third-party components](#third-party-components)
 - [Contributors](#contributors)
-- [Contacts](#contacts)
+- [Licence](#licence)
+
+## Quick start
+
+Build the image from this repository and keep the port bound to localhost.
+WebMap asks for a login; the user is created (or its password updated) at
+every container start from `WEBMAP_USER` / `WEBMAP_PASSWORD`. Django's
+password validators apply: a rejected password stops the container.
+
+```bash
+docker build -f docker/Dockerfile -t webmap:local .
+mkdir -p /tmp/webmap
+
+docker run -d \
+  --name webmap \
+  -h webmap \
+  -p 127.0.0.1:8000:8000 \
+  -e DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" \
+  -e WEBMAP_USER=webmap \
+  -e WEBMAP_PASSWORD='<choose a strong password>' \
+  -v /tmp/webmap:/opt/xml:ro \
+  webmap:local
+
+# run Nmap and save the XML report where the container can read it
+nmap -sT -A -T4 -oX /tmp/webmap/myscan.xml 192.168.1.0/24
+```
+
+Open http://localhost:8000 and log in. `docker/setup.txt` does the same
+interactively. For Docker secrets use `WEBMAP_PASSWORD_FILE` instead of
+`WEBMAP_PASSWORD` (an environment variable stays visible in
+`docker inspect`).
+
+Labels, notes and CVE results are stored in `/opt/notes` inside the
+container. Mount a volume there (`-v webmap-notes:/opt/notes`) if they must
+survive a container rebuild.
+
+Upgrading from a version that keyed annotations by file name only:
+`docker exec webmap python manage.py webmap_migrate_annotations` attaches
+the old ones to the scan files currently in `/opt/xml` (`--dry-run` to
+preview). Annotations now belong to one scan: they are keyed by the file
+name and a hash of its content, so a new scan saved under the same name
+starts clean.
+
+## Features
+
+- Import and parse Nmap XML files (incomplete files from a running scan are
+  listed with an error instead of breaking the page)
+- Statistics and charts on discovered services, ports and OS types
+- Host detail view, including hosts with only an IPv6 or MAC address
+- Labels and plain-text notes per host (any language, stored as UTF-8)
+- PDF report with statistics, port tables, NSE output, labels, notes and
+  CVEs, rendered on the server and returned directly (no file is left on
+  disk)
+- Copy curl, Nikto or Telnet commands for an open port to the clipboard
+  (arguments are shell-quoted)
+- CVE and exploit lookup for the CPEs Nmap reports
+
+## Configuration
+
+All settings come from environment variables. The important ones:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DJANGO_SECRET_KEY` | random per start (sessions are lost on restart) | Signing key; set it |
+| `WEBMAP_USER` / `WEBMAP_PASSWORD` / `WEBMAP_PASSWORD_FILE` | `webmap` / none | Login user created at start |
+| `ALLOWED_HOSTS` | `localhost,127.0.0.1,[::1]` | Host names the app answers to |
+| `WEBMAP_HTTPS` | `false` | Secure cookies, behind a TLS reverse proxy |
+| `CSRF_TRUSTED_ORIGINS` | empty | e.g. `https://webmap.example.internal` behind a proxy |
+
+The full list, including the reverse-proxy, HSTS, login-limit and logging
+settings, is in [docs/configuration.md](docs/configuration.md);
+[.env.example](.env.example) is a template for `docker run --env-file`.
 
 ## Security
 
-🔒 **Security is a top priority for this project.**
-
-### Security Features
-
-- ✅ **Automated Vulnerability Scanning**: GitHub Dependabot, CodeQL, Trivy
-- ✅ **Static Security Analysis**: Bandit, Semgrep
-- ✅ **Secret Scanning**: TruffleHog, detect-secrets
-- ✅ **Dependency Monitoring**: Daily scans for vulnerable dependencies
-- ✅ **Input Validation**: Comprehensive validation on all user inputs
-- ✅ **Security Headers**: CSP, X-Frame-Options, HSTS
-- ✅ **CSRF Protection**: Django CSRF middleware enabled
-- ✅ **Path Traversal Protection**: Secure file path handling
-- ✅ **Command Injection Prevention**: Subprocess with no shell execution
-- ✅ **XXE Protection**: Disabled external entities in XML parsing
-
-### Security Documentation
-
-- 📄 [SECURITY.md](SECURITY.md) - Security policy and best practices
-- 📄 [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md) - Detailed vulnerability analysis (14 CVEs fixed)
-- 📄 [SECURITY_UPDATE_GUIDE.md](SECURITY_UPDATE_GUIDE.md) - Update instructions
-- 📄 [SECURITY_AUTOMATION.md](SECURITY_AUTOMATION.md) - Automated security scanning setup
-- 📄 [SBOM.md](SBOM.md) - Software Bill of Materials documentation
-- 📄 [.github/SECURITY.md](.github/SECURITY.md) - GitHub security policy
-
-### Reporting Security Issues
-
-**DO NOT** report security vulnerabilities through public GitHub issues.
-
-Please use the [GitHub Security Advisories](https://github.com/mkilijanek/WebMap/security/advisories) feature or contact the maintainers directly.
-
-See [SECURITY.md](SECURITY.md#reporting-a-vulnerability) for details.
-
-## SBOM (Software Bill of Materials)
-
-🎯 **Complete transparency of all software components**
-
-WebMap provides comprehensive Software Bill of Materials (SBOM) in industry-standard formats.
-
-### Why SBOM?
-
-SBOM is like an "ingredient list" for software, enabling:
-
-- ✅ **Vulnerability Management**: Quickly identify vulnerable components
-- ✅ **Compliance**: Meet regulatory requirements (Executive Order 14028, NTIA)
-- ✅ **License Management**: Track all software licenses
-- ✅ **Supply Chain Security**: Understand your software supply chain
-- ✅ **Transparency**: Show users what's in the software
-
-### Available Formats
-
-**CycloneDX (OWASP):**
-- `.sbom/sbom.cyclonedx.json` - JSON format (recommended)
-- `.sbom/sbom.cyclonedx.xml` - XML format
-- Best for: Security scanning, DevSecOps
-
-**SPDX (Linux Foundation):**
-- `.sbom/sbom.spdx.json` - JSON format
-- Best for: License compliance, legal reviews
-- ISO/IEC 5962:2021 international standard
-
-### Automatic Generation
-
-SBOM is automatically generated on:
-- Every release (attached to GitHub Release)
-- Every push to main/master/develop
-- Monthly (1st of month)
-- Manual trigger via GitHub Actions
-
-### Current Components
-
-| Component | Version | License | Purpose |
-|-----------|---------|---------|---------|
-| Django | 5.2.9 | BSD-3-Clause | Web framework (LTS) |
-| requests | 2.32.5 | Apache-2.0 | HTTP library |
-| xmltodict | 0.14.2 | MIT | XML parsing |
-| defusedxml | 0.7.1 | Python-2.0 | Secure XML |
-
-### Using the SBOM
-
-```bash
-# Scan for vulnerabilities with Trivy
-trivy sbom .sbom/sbom.cyclonedx.json
-
-# Scan with OSV Scanner (Google)
-osv-scanner --sbom=.sbom/sbom.cyclonedx.json
-
-# Validate SBOM
-cyclonedx validate --input-file .sbom/sbom.cyclonedx.json
-
-# Extract licenses
-jq '.components[].licenses' .sbom/sbom.cyclonedx.json
-```
-
-### Compliance
-
-✅ **NTIA Minimum Elements** - All 7 required elements included
-✅ **Executive Order 14028** - Federal software requirements met
-✅ **ISO/IEC 5962:2021** - SPDX international standard
-✅ **CycloneDX v1.6** - Latest OWASP specification
-✅ **Automatically scanned** - Trivy + OSV integration
-
-See [SBOM.md](SBOM.md) for complete documentation.
-
-## Usage
-Build the image from this repository and keep it bound to localhost. WebMap asks for a login; the user is created at container start from `WEBMAP_USER` / `WEBMAP_PASSWORD` (Django password validators apply, a rejected password stops the container):
-```bash
-$ docker build -f docker/Dockerfile -t webmap:local .
-$ mkdir /tmp/webmap
-$ docker run -d \
-         --name webmap \
-         -h webmap \
-         -p 127.0.0.1:8000:8000 \
-         -e DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" \
-         -e WEBMAP_USER=webmap \
-         -e WEBMAP_PASSWORD='<choose a strong password>' \
-         -v /tmp/webmap:/opt/xml \
-         webmap:local
-
-$ # now you can run Nmap and save the XML Report on /tmp/webmap
-$ nmap -sT -A -T4 -oX /tmp/webmap/myscan.xml 192.168.1.0/24
-```
-Now point your browser to http://localhost:8000 and log in. `WEBMAP_PASSWORD_FILE` can be used instead of `WEBMAP_PASSWORD` (e.g. with Docker secrets).
-
-Labels, notes and CVE results belong to one scan: they are keyed by the file name and a hash of its content, so a new scan saved under the same file name starts clean. After upgrading from a version that keyed them by file name only, `docker exec webmap python manage.py webmap_migrate_annotations` attaches the old ones to the scan files currently in `/opt/xml` (`--dry-run` to preview).
-
-## Video
--- coming soon...
-
-## Features
-- Import and parse Nmap XML files
-- Statistics and Charts on discovered services, ports, OS, etc...
-- Inspect a single host by clicking on its IP address
-- Attach labels on a host
-- Insert notes for a specific host
-- Create a PDF Report with charts, details, labels and notes
-- Copy to clipboard as Nikto, Curl or Telnet commands
-- Search for CVE and Exploits based on CPE collected by Nmap
-
-## XML Filenames
-When creating the PDF version of the Nmap XML Report, the XML filename is used as document title on the first page.
-WebMap will replace some parts of the filename as following:
-
-- `_` will replaced by a space (` `)
-- `.xml` will be removed
-
-Example: `ACME_Ltd..xml`<br>
-PDF title: `ACME Ltd.`
-
-## CVE and Exploits
-thanks to the amazing API services by circl.lu, WebMap is able to looking for CVE and Exploits for each CPE collected by Nmap.
-Not all CPE are checked over the circl.lu API, but only when a specific version is specified
-(for example: `cpe:/a:microsoft:iis:7.5` and not `cpe:/o:microsoft:windows`).
-
-## Third Parts
-- [Django](https://www.djangoproject.com)
-- [Materialize CSS](https://materializecss.com)
-- [Clipboard.js](https://clipboardjs.com)
-- [Chart.js](https://www.chartjs.org)
-- [Wkhtmltopdf](https://wkhtmltopdf.org)
-- [API cve.circl.lu](https://cve.circl.lu)
-
-## Security Issues
-
-⚠️ **IMPORTANT**: This app is **NOT intended to be exposed on the internet**.
-
-### Security Warnings
-
-- **DO NOT** expose this application to the public internet
-- **DO NOT** use in multi-tenant environments without additional security
-- **DO** use only on localhost or secure internal networks
-- **DO** use VPN for remote access if needed
-- **DO** configure firewall rules to restrict access
-
-### Why Localhost Only?
-
-This application is designed as a **security assessment tool** for local use:
-
-1. **Sensitive Data**: Stores network scan results containing private/confidential information
-2. **Attack Surface**: Minimized by restricting to localhost
-3. **Use Case**: Intended for security professionals performing authorized assessments
-
-### Security Improvements (December 2025)
-
-Recent security update addressed **14 vulnerabilities** including:
-
-- ✅ **CRITICAL**: Command Injection (RCE) - **FIXED**
-- ✅ **CRITICAL**: Path Traversal - **FIXED**
-- ✅ **HIGH**: Hardcoded SECRET_KEY - **FIXED**
-- ✅ **HIGH**: DEBUG mode in production - **FIXED**
-- ✅ **HIGH**: Unrestricted ALLOWED_HOSTS - **FIXED**
-- ✅ **HIGH**: XXE Injection - **FIXED**
-- ✅ And 8 more vulnerabilities - **ALL FIXED**
-
-See [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md) for complete details.
-
-### Deployment Security Checklist
-
-Before deploying, ensure:
-
-```bash
-# Set environment variables
-export DJANGO_SECRET_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(50))")
-export DEBUG=False
-export ALLOWED_HOSTS=localhost,127.0.0.1
-
-# Verify security settings
-pip install -r requirements.txt
-bandit -r . -ll
-pip-audit --require requirements.txt
-```
-
-See [SECURITY_UPDATE_GUIDE.md](SECURITY_UPDATE_GUIDE.md) for complete deployment instructions.
-
-## Security Automation
-
-This project uses **automated security scanning** to ensure continuous security:
-
-### Automated Tools
-
-- **GitHub Dependabot**: Daily dependency vulnerability scanning
-- **CodeQL**: Weekly semantic code analysis
-- **Bandit**: Python security linter (on every commit)
-- **Trivy**: Comprehensive vulnerability scanner
-- **pip-audit**: Python package vulnerability checker
-- **Semgrep**: SAST (Static Application Security Testing)
-- **TruffleHog**: Secret scanning in git history
-- **Pre-commit hooks**: Local security checks before commit
-
-### GitHub Actions Workflows
-
-All security scans run automatically:
-
-- 🔍 **Security Scan**: Runs on every push and daily at 2:00 AM UTC
-- 🔍 **CodeQL Analysis**: Runs weekly on Monday at 3:00 AM UTC
-- 🔍 **Dependency Review**: Runs on every pull request
-- 🤖 **Dependabot**: Auto-merges security patches
-
-### Setting Up Local Security Tools
-
-```bash
-# Install pre-commit hooks
-pip install pre-commit
-pre-commit install
-
-# Run all security checks locally
-pre-commit run --all-files
-
-# Or run specific tools
-bandit -r . -ll
-pip-audit --require requirements.txt
-safety check
-```
-
-See [SECURITY_AUTOMATION.md](SECURITY_AUTOMATION.md) for complete documentation.
-
-### Security Monitoring
-
-All security findings are visible in:
-
-- **GitHub Security Tab**: Code scanning alerts, Dependabot alerts
-- **Actions Artifacts**: Detailed reports (pip-audit, bandit, trivy, etc.)
-- **Pull Request Comments**: Automatic security analysis on PRs
-
-### Security Metrics
-
-Current security status:
-
-- ✅ **0** Critical vulnerabilities
-- ✅ **0** High vulnerabilities
-- ✅ **100%** dependencies with pinned versions
-- ✅ **14** CVEs fixed in latest update
-- ✅ **6** automated security tools active
+What the application does, as of the v1.2 review (2026-10-14):
+
+- **Authentication** on every view (Django login, `LoginRequiredMiddleware`),
+  failed logins limited per user name and client address and logged.
+- **Output encoding**: every value from Nmap XML, notes and CVE data is
+  HTML-escaped; JavaScript receives data only through `data-*` attributes
+  and a JSON block, never through generated code.
+- **Content-Security-Policy**: scripts, styles and fonts only from the app
+  itself (`script-src 'self'`, no inline scripts), `frame-ancestors 'none'`.
+  All front-end libraries and fonts are vendored in `static/vendor/`.
+- **CSRF**: state changes are POST-only with Django's CSRF protection;
+  cookies are `HttpOnly`, `SameSite=Strict`, `Secure` with `WEBMAP_HTTPS`.
+- **Files**: scan and annotation names are validated, paths resolved
+  (symlinks included) and confined to their directory; annotations can
+  only be written for hosts of the selected scan.
+- **XML**: parsed with entity expansion disabled and a size limit
+  (`WEBMAP_MAX_XML_MB`, default 100).
+- **PDF**: `wkhtmltopdf` gets the HTML on stdin with JavaScript and local
+  file access disabled; no shell, no callback to the web server.
+- **Container**: runs as an unprivileged user that cannot modify the code;
+  no TLS of its own (put a reverse proxy in front for remote access).
+
+Known limitations and accepted risks are listed in
+[SECURITY.md](SECURITY.md#known-limitations). Report vulnerabilities
+privately, as described there, not in public issues.
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [SECURITY.md](SECURITY.md) | Security policy, reporting, threat model, controls, limitations |
+| [docs/configuration.md](docs/configuration.md) | All environment variables |
+| [docs/deployment.md](docs/deployment.md) | Running the container, TLS reverse proxy, hardening checklist |
+| [docs/development.md](docs/development.md) | Running the tests, local scanners, CI workflows, dependency updates |
+| [docs/sbom.md](docs/sbom.md) | Software bill of materials in `.sbom/` |
+| [docs/security-history.md](docs/security-history.md) | Past security reviews and what fixed each finding |
+| [CHANGELOG.md](CHANGELOG.md) | Notable changes |
+
+## XML file names
+
+Scan files must be in `/opt/xml`, end in `.xml` and use only letters,
+digits, `-`, `_` and `.` (no leading dot). Other files are not listed.
+
+The PDF report uses the file name as its title: `.xml` is removed and `_`
+becomes a space. Example: `ACME_Ltd..xml` gives the title `ACME Ltd.`
+
+## CVE and exploits
+
+WebMap looks up CVEs and exploits for each CPE Nmap collected, using the
+[CIRCL](https://cve.circl.lu) API (`WEBMAP_CVE_API`). Only CPEs with a
+version are checked (for example `cpe:/a:microsoft:iis:7.5`, not
+`cpe:/o:microsoft:windows`), and only CPEs that appear in the selected scan
+for that host and port. The lookup sends the CPE strings, not host
+addresses, to the API.
+
+CIRCL has moved its cve-search service to Vulnerability-Lookup. Whether the
+legacy `/api/cvefor/<cpe>` endpoint and its response format are still served
+could not be verified during the v1.2 review (the API was not reachable from
+the review environment). If lookups return "Failed to fetch CVE data from
+external API", check the endpoint first.
+
+## Third-party components
+
+Runtime (Python): [Django](https://www.djangoproject.com),
+[requests](https://requests.readthedocs.io),
+[xmltodict](https://github.com/martinblech/xmltodict),
+[gunicorn](https://gunicorn.org) (container only).
+System: [wkhtmltopdf](https://wkhtmltopdf.org) from Debian (container only).
+
+Front end, vendored in `static/vendor/` with checksums in
+[static/vendor/README.md](static/vendor/README.md):
+[Materialize CSS](https://materializecss.com), [jQuery](https://jquery.com),
+[Chart.js](https://www.chartjs.org), [Clipboard.js](https://clipboardjs.com),
+[Font Awesome Free](https://fontawesome.com),
+[Material Icons](https://github.com/google/material-design-icons).
 
 ## Contributors
-This project is currently a beta, and I'm not super skilled on Django so, every type of contribution is appreciated.
-I'll mention all contributors in this section of the README file.
 
-### Contributors List
+Original project by Andrea "theMiddle" Menin
+([@Menin_TheMiddle](https://twitter.com/Menin_TheMiddle)), Rev3rse Security.
+
 - s3th_0x [@adubaldo](https://github.com/adubaldo) (bug on single host report)
 - Neetx [@Neetx](https://github.com/Neetx) (bug on xml with no host up)
 
-## Contacts
-Twitter: [@Menin_TheMiddle](https://twitter.com/Menin_TheMiddle)<br>
-YouTube: [Rev3rseSecurity](https://www.youtube.com/rev3rsesecurity)
+## Licence
+
+GNU General Public License v3.0, see [LICENSE](LICENSE).

@@ -8,7 +8,7 @@ read -s -p "Choose a WebMap password: " WEBMAP_PASSWORD; echo
 docker run -d --name webmap -h webmap -p 127.0.0.1:8000:8000 \
     -e DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" \
     -e WEBMAP_USER=webmap -e WEBMAP_PASSWORD="$WEBMAP_PASSWORD" \
-    -v /tmp/webmap:/opt/xml webmap:local
+    -v /tmp/webmap:/opt/xml:ro -v webmap-notes:/opt/notes webmap:local
 unset WEBMAP_PASSWORD
 echo "[+] Done"
 echo -e "\nNow you can point your browser to http://localhost:8000 and log in as 'webmap'"

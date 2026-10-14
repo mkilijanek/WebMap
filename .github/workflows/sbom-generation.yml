@@ -48,7 +48,7 @@ jobs:
           mkdir -p .sbom
           for fmt in JSON XML; do
             ext=$(echo "$fmt" | tr 'A-Z' 'a-z')
-            cyclonedx-py environment /tmp/webmap-env --pyproject /dev/null \
+            cyclonedx-py environment /tmp/webmap-env --pyproject pyproject.toml \
               --of "$fmt" --sv 1.6 --mc-type application \
               -o ".sbom/sbom.cyclonedx.$ext"
           done
