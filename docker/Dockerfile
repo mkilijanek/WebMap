@@ -1,41 +1,42 @@
 # WebMap
 # -
-# https://github.com/Rev3rseSecurity/WebMap
-# Rev3rse Security: https://www.youtube.com/rev3rsesecurity
-# Author: theMiddle
-# -
-# Usage:
-#   $ cd /opt
-#   $ git clone https://github.com/Rev3rseSecurity/WebMap.git
-#   $ cd WebMap/docker
-#   $ docker build -t webmap:latest .
-#   $ docker run -d -v /opt/WebMap/docker/xml:/opt/xml -p 8000:8000 webmap:latest
+# Builds this repository (not upstream) with the pinned requirements.txt.
+#
+# Usage, from the repository root:
+#   $ docker build -f docker/Dockerfile -t webmap:local .
+#   $ mkdir -p /tmp/webmap
+#   $ docker run -d --name webmap -p 127.0.0.1:8000:8000 \
+#       -e DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" \
+#       -v /tmp/webmap:/opt/xml webmap:local
 #
 # Nmap Example:
-#   $ nmap -sT -A -oX /tmp/myscan.xml 192.168.1.0/24
-#   $ mv /tmp/myscan.xml /opt/WebMap/docker/xml
+#   $ nmap -sT -A -oX /tmp/webmap/myscan.xml 192.168.1.0/24
 #
 # Now you can point your browser to http://localhost:8000
+# WebMap has no authentication: keep it bound to localhost.
 
-FROM ubuntu:latest
+FROM python:3.12-slim-bookworm
 
-RUN apt-get update && apt-get install -y --allow-downgrades --allow-remove-essential --allow-change-held-packages \
-    python3 python3-pip curl wget git wkhtmltopdf libssl1.0-dev
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends wkhtmltopdf && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN mkdir /opt/xml && mkdir /opt/notes && \
-    wget -P /opt/ https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.4/wkhtmltox-0.12.4_linux-generic-amd64.tar.xz && \
-    cd /opt/ && tar -xvf /opt/wkhtmltox-0.12.4_linux-generic-amd64.tar.xz
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt gunicorn==23.0.0 && \
+    mkdir -p /opt/nmapdashboard /opt/xml /opt/notes && \
+    django-admin startproject nmapdashboard /opt/nmapdashboard
 
-RUN pip3 install Django requests xmltodict && \
-    cd /opt/ && django-admin startproject nmapdashboard && cd /opt/nmapdashboard && \
-    git clone https://github.com/Rev3rseSecurity/WebMap.git && \
-    mv WebMap nmapreport && cd nmapreport && git checkout v2/master
+COPY . /opt/nmapdashboard/nmapreport
+COPY docker/settings.py docker/urls.py /opt/nmapdashboard/nmapdashboard/
 
-COPY settings.py /opt/nmapdashboard/nmapdashboard/
-COPY urls.py /opt/nmapdashboard/nmapdashboard/
+WORKDIR /opt/nmapdashboard
+RUN DJANGO_SECRET_KEY=build-only python manage.py migrate --noinput && \
+    useradd --system --no-create-home --home-dir /opt/nmapdashboard webmap && \
+    chown webmap /opt/nmapdashboard /opt/nmapdashboard/db.sqlite3 /opt/notes /opt/nmapdashboard/nmapreport/static
 
-RUN cd /opt/nmapdashboard && python3 manage.py migrate
-
+USER webmap
 EXPOSE 8000
 
-ENTRYPOINT ["python3", "/opt/nmapdashboard/manage.py", "runserver", "0:8000"]
+# One process so the per-process fallback SECRET_KEY stays consistent;
+# threads are needed because PDF generation calls back into the app.
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "4", "--timeout", "60", "nmapdashboard.wsgi:application"]

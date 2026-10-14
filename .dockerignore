@@ -1,0 +1,6 @@
+.git
+.github
+.sbom
+**/__pycache__
+*.pyc
+.env

@@ -149,25 +149,22 @@ jq '.components[].licenses' .sbom/sbom.cyclonedx.json
 See [SBOM.md](SBOM.md) for complete documentation.
 
 ## Usage
-You should use this with docker, just by sending this command:
+Build the image from this repository and keep it bound to localhost (WebMap has no authentication):
 ```bash
+$ docker build -f docker/Dockerfile -t webmap:local .
 $ mkdir /tmp/webmap
 $ docker run -d \
          --name webmap \
          -h webmap \
-         -p 8000:8000 \
+         -p 127.0.0.1:8000:8000 \
+         -e DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" \
          -v /tmp/webmap:/opt/xml \
-         rev3rse/webmap
+         webmap:local
 
 $ # now you can run Nmap and save the XML Report on /tmp/webmap
 $ nmap -sT -A -T4 -oX /tmp/webmap/myscan.xml 192.168.1.0/24
 ```
 Now point your browser to http://localhost:8000
-
-### Quick and Dirty
-```bash
-$ curl -sL http://bit.ly/webmapsetup | bash
-```
 
 ## Video
 -- coming soon...

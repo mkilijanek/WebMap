@@ -159,10 +159,6 @@ CSRF_COOKIE_SAMESITE = 'Strict'
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
 
-# Content Security Policy (basic)
-# For production, consider using django-csp package
-CSP_DEFAULT_SRC = ("'self'",)
-CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "https://www.google.com", "https://apis.google.com")
-CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
-CSP_IMG_SRC = ("'self'", "data:")
-CSP_FONT_SRC = ("'self'",)
+# Content Security Policy: not enabled. The CSP_* settings that used to be
+# here had no effect (django-csp is not installed), and the views rely on
+# inline <script> blocks, so a useful policy needs a template refactor first.

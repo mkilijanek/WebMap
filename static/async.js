@@ -1,3 +1,7 @@
+function getCSRFToken() {
+	return $('input[name="csrfmiddlewaretoken"]').val();
+}
+
 $(document).ready(function() {
 	// doc ready
 });
@@ -72,7 +76,7 @@ function checkCPETOT() {
 
 function genPDF(md5scan) {
 	if(/^[a-f0-9]{32,32}$/.test(md5scan)) {
-		$.get('/report/api/pdf/').done(function(data) {
+		$.post('/report/api/pdf/', {'csrfmiddlewaretoken': getCSRFToken()}).done(function(data) {
 			console.log(data);
 			$('#modal1').css('background-color','#3e3e3e');
 			$('#modaltitle').html('Generating PDF Report');
@@ -92,7 +96,7 @@ function genPDF(md5scan) {
 }
 
 function removeNotes(hashstr, i) {
-	$.get('/report/api/rmnotes/'+hashstr+'/').done(function(data) {
+	$.post('/report/api/rmnotes/'+hashstr+'/', {'csrfmiddlewaretoken': getCSRFToken()}).done(function(data) {
 		if(data['ok'] == 'notes removed') {
 			$('#noteshost'+i).remove();
 		}
@@ -179,7 +183,7 @@ function apiPortDetails(address, portid) {
 }
 
 function removeLabel(type, hashstr, i) {
-	$.get('/report/api/rmlabel/'+type+'/'+hashstr+'/').done(function(data) {
+	$.post('/report/api/rmlabel/'+type+'/'+hashstr+'/', {'csrfmiddlewaretoken': getCSRFToken()}).done(function(data) {
 		if(data['ok'] == 'label removed') {
 			$('#hostlabel'+i).attr("class","")
 			$('#hostlabel'+i).html("");
@@ -188,7 +192,7 @@ function removeLabel(type, hashstr, i) {
 }
 
 function setLabel(type, label, hashstr, i) {
-	$.get('/report/api/setlabel/'+type+'/'+label+'/'+hashstr+'/').done(function(data) {
+	$.post('/report/api/setlabel/'+type+'/'+label+'/'+hashstr+'/', {'csrfmiddlewaretoken': getCSRFToken()}).done(function(data) {
 		console.log(data);
 		var res = data;
 		var color = 'grey'; var margin = '10px';
