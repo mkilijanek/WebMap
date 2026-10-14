@@ -115,7 +115,7 @@ def load_scan(filename):
 	if not isinstance(parsed, dict) or not isinstance(parsed.get('nmaprun'), dict):
 		raise ScanError('not an nmap XML file')
 
-	key = hashlib.md5((filename + '\0' + hashlib.sha256(raw).hexdigest()).encode('utf-8')).hexdigest()
+	key = hashlib.md5((filename + '\0' + hashlib.sha256(raw).hexdigest()).encode('utf-8'), usedforsecurity=False).hexdigest()
 	scan = Scan(filename, _normalize(parsed['nmaprun']), key)
 
 	with _cache_lock:
@@ -184,7 +184,7 @@ def find_host(scan, address):
 
 
 def md5(value):
-	return hashlib.md5(str(value).encode('utf-8')).hexdigest()
+	return hashlib.md5(str(value).encode('utf-8'), usedforsecurity=False).hexdigest()
 
 
 def filter_cves(data):

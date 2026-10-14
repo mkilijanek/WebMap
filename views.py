@@ -48,7 +48,6 @@ def details(request, address):
 
 	r['scantitle'] = scan.name
 	r['trhost'] = ''
-	v,e,z,h = '','','',''
 	pc,po,pf=0,0,0
 
 	addressmd5 = md5(address)
@@ -467,7 +466,7 @@ def index(request, filterservice="", filterportid=""):
 			allpilabels += jsstr(i)+', '
 			allpidata += ''+str(picount[i])+','
 			allpic = (allpic + 1)
-		elif allpic > 5 and allpic <= 10:
+		elif allpic <= 10:
 			allpilinks += '<a href="/report/portid/'+esc(urllib.parse.quote(i, safe=''))+'/">'+esc(i)+'</a>, '
 			allpic = (allpic + 1)
 
