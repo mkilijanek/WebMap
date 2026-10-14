@@ -2,19 +2,23 @@ function getCSRFToken() {
 	return $('input[name="csrfmiddlewaretoken"]').val();
 }
 
+function escHTML(s) {
+	return $('<span/>').text(String(s)).html();
+}
+
 $(document).ready(function() {
-	// doc ready
+	// Port details buttons carry their values in data-* attributes instead
+	// of inline JavaScript built on the server.
+	$(document).on('click', '.portdetails', function() {
+		apiPortDetails($(this).attr('data-address'), $(this).attr('data-portid'));
+	});
 });
 
 var cpetot = 0;
 var cpetimer;
 function checkCVE() {
-	cpe = JSON.parse(atob(decodeURIComponent($('#cpestring').val())));
-	csrftoken = $('input[name="csrfmiddlewaretoken"]').val();
-	console.log(cpe);
-	/* $.get('http://cve.circl.lu/api/cvefor/cpe:/a:openbsd:openssh:7.6').done(function(d) {
-		console.log(d);
-	}); */
+	var cpe = JSON.parse(atob(decodeURIComponent($('#cpestring').val())));
+	var csrftoken = getCSRFToken();
 
 	$('#modal1').css('background-color','#3e3e3e');
 	$('#modaltitle').html('Looking for CVE and Exploits');
@@ -25,35 +29,34 @@ function checkCVE() {
 	$('#modalfooter').html('');
 	$('#modal1').modal('open');
 
-	cpetot = Object.keys(cpe).length;
-	console.log(cpetot);
-
-	for(host in cpe) {
-		for(port in cpe[host]) {
-			for(cpestr in cpe[host][port]) {
+	// one request per CPE string, so count CPE strings (not hosts)
+	var jobs = [];
+	for(var host in cpe) {
+		for(var port in cpe[host]) {
+			for(var cpestr in cpe[host][port]) {
 				if(/^cpe:.+:.+:.+:.*$/.test(cpestr)) {
-					console.log(cpestr);
-					$.post('/report/api/getcve/', {
-						'cpe': cpestr,
-						'host':host,
-						'port':port,
-						'csrfmiddlewaretoken': csrftoken
-					}).done(function(d) {
-						console.log(d);
-						for(rhost in d) {
-							for(rport in d[rhost]) {
-								$('#modalbody').append('<div class="small"><i>Received: '+d[rhost][rport]['id']+' host:'+rhost+' port:'+rport+'</i></div>');
-							}
-						}
-					}).always(function() { cpetot = (cpetot - 1); });
-				} else {
-					cpetot = (cpetot - 1);
+					jobs.push([host, port, cpestr]);
 				}
-
-				console.log(cpetot);
 			}
 		}
 	}
+	cpetot = jobs.length;
+
+	jobs.forEach(function(job) {
+		$.post('/report/api/getcve/', {
+			'cpe': job[2],
+			'host': job[0],
+			'port': job[1],
+			'csrfmiddlewaretoken': csrftoken
+		}).done(function(d) {
+			for(var rhost in d) {
+				if(typeof(d[rhost]) !== 'object') { continue; }
+				for(var rport in d[rhost]) {
+					$('#modalbody').append('<div class="small"><i>Received: '+escHTML(d[rhost][rport]['id'])+' host:'+escHTML(rhost)+' port:'+escHTML(rport)+'</i></div>');
+				}
+			}
+		}).always(function() { cpetot = (cpetot - 1); });
+	});
 
 	cpetimer = setInterval(function() {
 		if(checkCPETOT()) {
@@ -74,25 +77,20 @@ function checkCPETOT() {
 	}
 }
 
-function genPDF(md5scan) {
-	if(/^[a-f0-9]{32,32}$/.test(md5scan)) {
-		$.post('/report/api/pdf/', {'csrfmiddlewaretoken': getCSRFToken()}).done(function(data) {
-			console.log(data);
-			$('#modal1').css('background-color','#3e3e3e');
-			$('#modaltitle').html('Generating PDF Report');
-		
-			$('#modalbody').html('Please wait a few seconds...<br>'+
-			'<div class="progress"><div class="indeterminate"></div></div>'+
-			'<br><br>You\'ll be redirected to the PDF Report:<br>')
-			$('#modal1').modal('open');
-		});
+function genPDF() {
+	// The server returns the PDF in the response to this POST; a normal form
+	// submission lets the browser show or save it. No file is left on the
+	// server and nothing has to be polled.
+	$('#modal1').css('background-color','#3e3e3e');
+	$('#modaltitle').html('Generating PDF Report');
+	$('#modalbody').html('Please wait a few seconds, the PDF will open when it is ready.<br>'+
+	'<div class="progress"><div class="indeterminate"></div></div>');
+	$('#modal1').modal('open');
 
-		var pdfcheck = setInterval(function() {
-			$.get('/static/'+md5scan+'.pdf')
-			.done(function() { $('#modalbody').append('PDF ready! Please wait...<br>'); setTimeout(function() { location.href='/static/'+md5scan+'.pdf' }, 3000); })
-			.fail(function() { $('#modalbody').append('<i>PDF not ready yet...</i><br>'); });
-		}, 2000);
-	}
+	var form = $('<form method="post" action="/report/api/pdf/"></form>');
+	form.append($('<input type="hidden" name="csrfmiddlewaretoken">').val(getCSRFToken()));
+	$('body').append(form);
+	form.submit();
 }
 
 function removeNotes(hashstr, i) {
@@ -132,15 +130,9 @@ function openNotes(hashstr, notesb64) {
 		$('#modaltitle').html('Save Notes');
 		$('#modalbody').html(
 			'In the text area below, you can insert notes that will appear on the PDF report. '+
-			'All input here are <b class="blue-text">intentionally not sanitized</b>, so you can use HTML markup and JavaScript. '+
-			'Please, keep in mind that <b class="orange-text">you can break the PDF View HTML</b> and, of course, this represents a stored XSS vector.<br><br>'+
-			'<textarea id="notes" style="color:#fff;min-height:160px;">'+$('<span/>').text(savednotes).html()+'</textarea>'+
-			'<input type="hidden" id="hashstr" value="'+hashstr+'" /><br><br>'+
-			'<b>Tips:</b><br>'+
-			'<code class="grey-text">&lt;b&gt;bold text&lt;/b&gt;</code> = <b>bold text</b><br>'+
-			'<code class="grey-text">&lt;i&gt;italic text&lt;/i&gt;</code> = <i>italic text</i><br>'+
-			'<code class="grey-text">&lt;span class="label green"&gt;A green label&lt;/span&gt;</code> = <span class="label green">A green label</span><br>'+
-			'<code class="grey-text">&lt;code&gt;monospace font&lt;/code&gt;</code> = <code>monospace font</code>'
+			'Notes are shown as plain text: HTML markup is displayed literally, not rendered.<br><br>'+
+			'<textarea id="notes" style="color:#fff;min-height:160px;">'+escHTML(savednotes)+'</textarea>'+
+			'<input type="hidden" id="hashstr" value="'+hashstr+'" />'
 		);
 		$('#modalfooter').html('<button onclick="javascript:saveNotes();" class="waves-effect waves-green btn grey white-text">Save</button>');
 		$('#modal1').modal('open');
@@ -148,7 +140,7 @@ function openNotes(hashstr, notesb64) {
 }
 
 function apiPortDetails(address, portid) {
-	$.get('/report/api/'+address+'/'+portid+'/').done(function(data) {
+	$.get('/report/api/'+encodeURIComponent(address)+'/'+encodeURIComponent(portid)+'/').done(function(data) {
 		console.log(data);
 
 		$('#modaltitle').html('Port Details: <span class="blue-text">'+$('<span/>').text(data['@portid']).html()+' / '+$('<span/>').text(data['@protocol']).html()+'</span>');

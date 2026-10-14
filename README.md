@@ -149,7 +149,7 @@ jq '.components[].licenses' .sbom/sbom.cyclonedx.json
 See [SBOM.md](SBOM.md) for complete documentation.
 
 ## Usage
-Build the image from this repository and keep it bound to localhost (WebMap has no authentication):
+Build the image from this repository and keep it bound to localhost. WebMap asks for a login; the user is created at container start from `WEBMAP_USER` / `WEBMAP_PASSWORD` (Django password validators apply, a rejected password stops the container):
 ```bash
 $ docker build -f docker/Dockerfile -t webmap:local .
 $ mkdir /tmp/webmap
@@ -158,13 +158,17 @@ $ docker run -d \
          -h webmap \
          -p 127.0.0.1:8000:8000 \
          -e DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" \
+         -e WEBMAP_USER=webmap \
+         -e WEBMAP_PASSWORD='<choose a strong password>' \
          -v /tmp/webmap:/opt/xml \
          webmap:local
 
 $ # now you can run Nmap and save the XML Report on /tmp/webmap
 $ nmap -sT -A -T4 -oX /tmp/webmap/myscan.xml 192.168.1.0/24
 ```
-Now point your browser to http://localhost:8000
+Now point your browser to http://localhost:8000 and log in. `WEBMAP_PASSWORD_FILE` can be used instead of `WEBMAP_PASSWORD` (e.g. with Docker secrets).
+
+Labels, notes and CVE results belong to one scan: they are keyed by the file name and a hash of its content, so a new scan saved under the same file name starts clean. After upgrading from a version that keyed them by file name only, `docker exec webmap python manage.py webmap_migrate_annotations` attaches the old ones to the scan files currently in `/opt/xml` (`--dry-run` to preview).
 
 ## Video
 -- coming soon...
