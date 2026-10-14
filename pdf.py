@@ -165,8 +165,8 @@ def reportPDFView(request):
 					hdhtml_protocolor = 'red'
 				
 				hostdetails_html_tr += '<tr>'+\
-				'	<td><span class="'+hdhtml_protocolor+'-text">'+p['@protocol']+'</span> / <span class=""><b>'+p['@portid']+'</b></span><br><span class="small">'+p['service']['@name']+'</span></td>'+\
-				'	<td>'+hdhtml_stateico+' '+p['state']['@state']+'</td>'+\
+				'	<td><span class="'+hdhtml_protocolor+'-text">'+esc(p['@protocol'])+'</span> / <span class=""><b>'+esc(p['@portid'])+'</b></span><br><span class="small">'+esc(p['service']['@name'])+'</span></td>'+\
+				'	<td>'+hdhtml_stateico+' '+esc(p['state']['@state'])+'</td>'+\
 				'	<td>'+hdhtml_product+' / '+hdhtml_version+'</td>'+\
 				'</tr>'
 
@@ -184,7 +184,7 @@ def reportPDFView(request):
 							continue
 
 						if script['@output'].replace('\n','') != '' and script['@id'] not in filterscriptid:
-							portdetails_html_tr += '<div class="extratitle"><b class="red-text">'+html.escape(script['@id'])+'</b> - Address: <b>'+html.escape(saddress)+'</b> - Port: <b>'+p['@portid']+'</b></div>'+\
+							portdetails_html_tr += '<div class="extratitle"><b class="red-text">'+html.escape(script['@id'])+'</b> - Address: <b>'+html.escape(saddress)+'</b> - Port: <b>'+esc(p['@portid'])+'</b></div>'+\
 							'<div class="extrainfo">'+html.escape(script['@output']).replace('\n','<br>')+'</div>'
 
 				portsfound = True
@@ -194,8 +194,8 @@ def reportPDFView(request):
 			if addressmd5 in noteshost[scanmd5]:
 				notesb64 = noteshost[scanmd5][addressmd5]
 				notesout = '<div style="page-break-before: always;">'+\
-				'	<h3>Notes for host '+saddress+'</h3>'+\
-				'	'+base64.b64decode(urllib.parse.unquote(notesb64)).decode('ascii')+\
+				'	<h3>Notes for host '+esc(saddress)+'</h3>'+\
+				'	'+notestohtml(notesb64)+\
 				'</div>'
 
 
@@ -207,25 +207,25 @@ def reportPDFView(request):
 					for cveobj in cvejson:
 
 						cverefout = ''
-						for cveref in cveobj['references']:
-							cverefout += '<a href="'+cveref+'">'+cveref+'</a><br>'
+						for cveref in cveobj.get('references', []):
+							cverefout += '<a href="'+safeurl(cveref)+'">'+esc(cveref)+'</a><br>'
 
 						cveexdbout = ''
 						if 'exploit-db' in cveobj:
 							cveexdbout = '<br><div class="small" style="line-height:20px;"><b>Exploit DB:</b><br>'
 							for cveexdb in cveobj['exploit-db']:
 								if 'title' in cveexdb:
-									cveexdbout += '<a href="'+cveexdb['source']+'">'+html.escape(cveexdb['title'])+'</a><br>'
+									cveexdbout += '<a href="'+safeurl(cveexdb.get('source', ''))+'">'+html.escape(cveexdb['title'])+'</a><br>'
 							cveexdbout += '</div>'
 
 						cveout += '<div style="line-height:28px;padding:10px;margin-top:10px;border-bottom:solid #ccc 1px;">'+\
-						'	<span class="label red">'+html.escape(cveobj['id'])+'</span> '+html.escape(cveobj['summary'])+'<br><br>'+\
+						'	<span class="label red">'+esc(cveobj.get('id', ''))+'</span> '+esc(cveobj.get('summary', ''))+'<br><br>'+\
 						'	<div class="small" style="line-height:20px;"><b>References:</b><br>'+cverefout+'</div>'+\
 						cveexdbout+\
 						'</div>'
 
 				cveout_html = '<div style="page-break-before: always;">'+\
-				'	<h3>CVE List for '+saddress+':</h3>'+\
+				'	<h3>CVE List for '+esc(saddress)+':</h3>'+\
 				cveout+\
 				'</div>'
 
@@ -239,7 +239,7 @@ def reportPDFView(request):
 			'	<table><thead><tr><th>Protocol / Port</th><th>Port State</th><th>Product / Version</th></tr></thead><tbody>'+\
 			hostdetails_html_tr+\
 			'</tbody></table></div>'+\
-			'<div style="page-break-before: always;"><h3>NSE Scripts for '+saddress+':</h3>'+portdetails_html_tr+'</div>'+\
+			'<div style="page-break-before: always;"><h3>NSE Scripts for '+esc(saddress)+':</h3>'+portdetails_html_tr+'</div>'+\
 			notesout+\
 			cveout_html
 
@@ -257,14 +257,14 @@ def reportPDFView(request):
 	html_ports = ''
 	javascript_ports = ''
 	for ii in counters['pi']:
-		html_ports += '<b>'+str(ii)+'</b> <span class="grey-text">('+str(counters['pi'][ii])+')</span>, '
-		javascript_ports += '["'+str(ii)+'", '+str(counters['pi'][ii])+'],'
+		html_ports += '<b>'+esc(ii)+'</b> <span class="grey-text">('+str(counters['pi'][ii])+')</span>, '
+		javascript_ports += '['+jsstr(ii)+', '+str(counters['pi'][ii])+'],'
 
 	html_services = ''
 	javascript_services = ''
 	for ii in counters['ss']:
-		html_services += '<b>'+str(ii)+'</b> <span class="grey-text">('+str(counters['ss'][ii])+')</span>, '
-		javascript_services += '["'+str(ii)+'", '+str(counters['ss'][ii])+'],'
+		html_services += '<b>'+esc(ii)+'</b> <span class="grey-text">('+str(counters['ss'][ii])+')</span>, '
+		javascript_services += '['+jsstr(ii)+', '+str(counters['ss'][ii])+'],'
 
 
 	r['html'] += '<script type="text/javascript" src="https://www.google.com/jsapi?autoload={%27modules%27:[{%27name%27:%27visualization%27,%27version%27:%271.1%27,%27packages%27:[%27corechart%27,%27sankey%27,%27annotationchart%27]}]}"></script>'+\

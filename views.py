@@ -94,7 +94,7 @@ def details(request, address):
 			if 'hostnames' in i:
 				if type(i['hostnames']) is dict and 'hostname' in i['hostnames']:
 					if '@name' in i['hostnames']['hostname']:
-						h = '<span style="color:#999;font-size:12px;">'+i['hostnames']['hostname']['@name']+'</span>'
+						h = '<span style="color:#999;font-size:12px;">'+esc(i['hostnames']['hostname']['@name'])+'</span>'
 
 			labelout = '<span id="hostlabel"></span>'
 			if scanmd5 in labelhost:
@@ -148,17 +148,17 @@ def details(request, address):
 				v,z,e = '','','<i class="grey-text">N/A</i>'
 				if p['state']['@state'] == 'open':
 					if '@version' in p['service']:
-						v = p['service']['@version']
+						v = esc(p['service']['@version'])
 					else:
 						v = '<i class="grey-text">No Version</i>'
 
 					if '@product' in p['service']:
-						z = p['service']['@product']
+						z = esc(p['service']['@product'])
 					else:
 						z = '<i class="grey-text">No Product</i>'
 
 					if '@extrainfo' in p['service']:
-						e = p['service']['@extrainfo']
+						e = esc(p['service']['@extrainfo'])
 
 					cpe = ''
 					if 'cpe' in p['service']:
@@ -170,10 +170,10 @@ def details(request, address):
 							
 
 					r['trhost'] += '<tr><td style="vertical-align:top;">'+\
-					'<span style="color:#999;font-size:12px;">'+p['service']['@name']+'</span><br>'+\
-					'<span class="new badge blue" data-badge-caption="">'+p['@protocol']+' / '+p['@portid']+'</span>'+\
+					'<span style="color:#999;font-size:12px;">'+esc(p['service']['@name'])+'</span><br>'+\
+					'<span class="new badge blue" data-badge-caption="">'+esc(p['@protocol'])+' / '+esc(p['@portid'])+'</span>'+\
 					'</td>'+\
-					'<td>'+z+' / '+v+'<br><span style="font-size:12px;color:#999;">State: '+p['state']['@state']+'<br>Reason: '+p['state']['@reason']+'</span></td>'+\
+					'<td>'+z+' / '+v+'<br><span style="font-size:12px;color:#999;">State: '+esc(p['state']['@state'])+'<br>Reason: '+esc(p['state']['@reason'])+'</span></td>'+\
 					'<td style="vertical-align:top">'+e+'<br>'+cpe+'</td>'+\
 					'<td><ul id="dropdown'+str(pel)+'" class="dropdown-content" style="min-width:300px;">'+\
 					'	<li><a href="#!" class="btncpy" data-clipboard-text="curl -v -A \'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.1\' -k \'http://'+html.escape(address)+':'+html.escape(p['@portid'])+'\'">Copy as curl command</a></li>'+\
@@ -183,14 +183,14 @@ def details(request, address):
 					'<button onclick="javascript:apiPortDetails(\''+html.escape(address)+'\',\''+html.escape(p['@portid'])+'\');" class="btn blue right"><i class="material-icons">receipt</i></button></td>'+\
 					'</tr>'
 				elif p['state']['@state'] == 'filtered':
-					r['trhost'] += '<tr><td><span class="new badge grey" data-badge-caption="">'+p['@protocol']+' / '+p['@portid']+'</span><br>'+\
-					'<span style="color:#999;font-size:12px;">'+p['service']['@name']+'</span></td>'+\
-					'<td colspan="2" style="color:#999;font-size:12px;">State: filtered<br>Reason: '+p['state']['@reason']+'</td>'+\
+					r['trhost'] += '<tr><td><span class="new badge grey" data-badge-caption="">'+esc(p['@protocol'])+' / '+esc(p['@portid'])+'</span><br>'+\
+					'<span style="color:#999;font-size:12px;">'+esc(p['service']['@name'])+'</span></td>'+\
+					'<td colspan="2" style="color:#999;font-size:12px;">State: filtered<br>Reason: '+esc(p['state']['@reason'])+'</td>'+\
 					'<td><button onclick="javascript:apiPortDetails(\''+html.escape(address)+'\',\''+html.escape(p['@portid'])+'\');" class="btn blue right"><i class="material-icons">receipt</i></button></td></tr>'
 				else:
-					r['trhost'] += '<tr><td><span class="new badge grey" data-badge-caption="">'+p['@protocol']+' / '+p['@portid']+'</span><br>'+\
-					'<span style="color:#999;font-size:12px;">'+p['service']['@name']+'</span></td>'+\
-					'<td colspan="2" style="color:#999;font-size:12px;">State: '+p['state']['@state']+'<br>Reason: '+p['state']['@reason']+'</td>'+\
+					r['trhost'] += '<tr><td><span class="new badge grey" data-badge-caption="">'+esc(p['@protocol'])+' / '+esc(p['@portid'])+'</span><br>'+\
+					'<span style="color:#999;font-size:12px;">'+esc(p['service']['@name'])+'</span></td>'+\
+					'<td colspan="2" style="color:#999;font-size:12px;">State: '+esc(p['state']['@state'])+'<br>Reason: '+esc(p['state']['@reason'])+'</td>'+\
 					'<td><button onclick="javascript:apiPortDetails(\''+html.escape(address)+'\',\''+html.escape(p['@portid'])+'\');" class="btn blue right"><i class="material-icons">receipt</i></button></td></tr>'
 
 		# this fix single host report
@@ -204,11 +204,11 @@ def details(request, address):
 			notesb64 = noteshost[scanmd5][addressmd5]
 			r['table'] += '<div class="card" style="background-color:#3e3e3e;">'+\
 			'	<div class="card-content"><h5>Notes</h5>'+\
-			'		'+base64.b64decode(urllib.parse.unquote(notesb64)).decode('ascii')+\
+			'		'+notestohtml(notesb64)+\
 			'	</div>'+\
 			'</div>'
 
-			#notesout = '<br><a id="noteshost'+str(hostindex)+'" href="#!" onclick="javascript:openNotes(\''+hashlib.md5(str(address).encode('utf-8')).hexdigest()+'\', \''+notesb64+'\');" class="small"><i class="fas fa-comment"></i> contains notes</a>'
+			#notesout = '<br><a id="noteshost'+str(hostindex)+'" href="#!" onclick="javascript:openNotes(\''+hashlib.md5(str(address).encode('utf-8')).hexdigest()+'\', \''+safenotesb64(notesb64)+'\');" class="small"><i class="fas fa-comment"></i> contains notes</a>'
 			#removenotes = '<li><a href="#!" onclick="javascript:removeNotes(\''+addressmd5+'\', \''+str(hostindex)+'\');">Remove notes</a></li>'
 
 	cveout = ''
@@ -220,19 +220,19 @@ def details(request, address):
 				for cveobj in cvejson:
 
 					cverefout = ''
-					for cveref in cveobj['references']:
-						cverefout += '<a href="'+cveref+'">'+cveref+'</a><br>'
+					for cveref in cveobj.get('references', []):
+						cverefout += '<a href="'+safeurl(cveref)+'">'+esc(cveref)+'</a><br>'
 
 					cveexdbout = ''
 					if 'exploit-db' in cveobj:
 						cveexdbout = '<br><div class="small" style="line-height:20px;"><b>Exploit DB:</b><br>'
 						for cveexdb in cveobj['exploit-db']:
 							if 'title' in cveexdb:
-								cveexdbout += '<a href="'+cveexdb['source']+'">'+html.escape(cveexdb['title'])+'</a><br>'
+								cveexdbout += '<a href="'+safeurl(cveexdb.get('source', ''))+'">'+html.escape(cveexdb['title'])+'</a><br>'
 						cveexdbout += '</div>'
 
 					cveout += '<div style="line-height:28px;padding:10px;border:solid #333 1px;border-radius:4px;margin-top:10px;">'+\
-					'	<span class="label red">'+html.escape(cveobj['id'])+'</span> '+html.escape(cveobj['summary'])+'<br><br>'+\
+					'	<span class="label red">'+esc(cveobj.get('id', ''))+'</span> '+esc(cveobj.get('summary', ''))+'<br><br>'+\
 					'	<div class="small" style="line-height:20px;"><b>References:</b><br>'+cverefout+'</div>'+\
 					cveexdbout+\
 					'</div>'
@@ -406,7 +406,7 @@ def index(request, filterservice="", filterportid=""):
 		hostname = ''
 
 		if 'hostnames' in i and type(i['hostnames']) is dict:
-			hostname += '<br><span style="color:#999;font-size:10px;">'+str(i['hostnames']['hostname']['@name'])+'</span>'
+			hostname += '<br><span style="color:#999;font-size:10px;">'+esc(i['hostnames']['hostname']['@name'])+'</span>'
 
 		if i['status']['@state'] == 'up':
 			hostsup = (hostsup + 1)
@@ -492,20 +492,20 @@ def index(request, filterservice="", filterportid=""):
 			services = ''
 			for s in ss:
 				if filterservice != ss[s]:
-					services += '<a href="/report/service/'+ss[s]+'/">'+ss[s]+'</a>, '
+					services += '<a href="/report/service/'+esc(ss[s])+'/">'+esc(ss[s])+'</a>, '
 				else:
-					services += '<span class="tmlabel" style="background-color:#ffcc00;color:#333;">'+ss[s]+'</span>, '
+					services += '<span class="tmlabel" style="background-color:#ffcc00;color:#333;">'+esc(ss[s])+'</span>, '
 
 			ostype = ''
 			for oty in ost:
-				ostype += '<i class="'+fromOSTypeToFontAwesome(html.escape(ost[oty]))+'"></i> <span class="grey-text small">'+ost[oty].lower()+'</span> '
+				ostype += '<i class="'+fromOSTypeToFontAwesome(html.escape(ost[oty]))+'"></i> <span class="grey-text small">'+esc(ost[oty].lower())+'</span> '
 
 			tdports = ''
 			for kp in pp:
 				if filterportid != pp[kp]:
-					tdports += '<a href="/report/portid/'+pp[kp]+'/">'+pp[kp]+'</a>, '
+					tdports += '<a href="/report/portid/'+esc(pp[kp])+'/">'+esc(pp[kp])+'</a>, '
 				else:
-					tdports += '<span class="tmlabel" style="background-color:#ffcc00;color:#333;">'+pp[kp]+'</span>, '
+					tdports += '<span class="tmlabel" style="background-color:#ffcc00;color:#333;">'+esc(pp[kp])+'</span>, '
 
 			poclass = ''
 			if po == 0:
@@ -522,7 +522,7 @@ def index(request, filterservice="", filterportid=""):
 			if scanmd5 in noteshost:
 				if addressmd5 in noteshost[scanmd5]:
 					notesb64 = noteshost[scanmd5][addressmd5]
-					notesout = '<br><a id="noteshost'+str(hostindex)+'" href="#!" onclick="javascript:openNotes(\''+hashlib.md5(str(address).encode('utf-8')).hexdigest()+'\', \''+notesb64+'\');" class="small"><i class="fas fa-comment"></i> contains notes</a>'
+					notesout = '<br><a id="noteshost'+str(hostindex)+'" href="#!" onclick="javascript:openNotes(\''+hashlib.md5(str(address).encode('utf-8')).hexdigest()+'\', \''+safenotesb64(notesb64)+'\');" class="small"><i class="fas fa-comment"></i> contains notes</a>'
 					removenotes = '<li><a href="#!" onclick="javascript:removeNotes(\''+addressmd5+'\', \''+str(hostindex)+'\');">Remove notes</a></li>'
 
 			cveout = ''
@@ -550,7 +550,7 @@ def index(request, filterservice="", filterportid=""):
 				r['trhost'] += '<tr class="'+poclass+'">'+\
 				'	<td><span class="leftlabel" style="background-color:#4a4a4a;color:#999;">'+str(hostindex)+'</span>'+\
 				'		'+ostype+'<br>'+\
-				'		<b><a href="/report/'+str(address)+'">'+str(address)+'</a></b>'+hostname+''+\
+				'		<b><a href="/report/'+esc(address)+'">'+esc(address)+'</a></b>'+hostname+''+\
 				notesout+\
 				cveout+\
 				'	</td>'+\
@@ -566,7 +566,7 @@ def index(request, filterservice="", filterportid=""):
 				'			<li><a href="#!" onclick="javascript:setLabel(\'host\', \'Checked\', \''+hashlib.md5(str(address).encode('utf-8')).hexdigest()+'\', '+str(hostindex)+');"><span class="tmlabel blue"><span class="tmlabel blue">Checked</span></a></li>'+\
 				'			<li><a href="#!" onclick="javascript:removeLabel(\'host\', \''+addressmd5+'\', '+str(hostindex)+');">Remove label</a></li>'+\
 				'			<li class="divider"></li>'+\
-				'			<li><a href="#!" onclick="javascript:openNotes(\''+hashlib.md5(str(address).encode('utf-8')).hexdigest()+'\', \''+notesb64+'\');">Insert notes</a></li>'+\
+				'			<li><a href="#!" onclick="javascript:openNotes(\''+hashlib.md5(str(address).encode('utf-8')).hexdigest()+'\', \''+safenotesb64(notesb64)+'\');">Insert notes</a></li>'+\
 				'			'+removenotes+\
 				'		</ul>'+\
 				labelout+\
@@ -600,9 +600,9 @@ def index(request, filterservice="", filterportid=""):
 	'</div>'+\
 	'<div class="row">'+\
 	'	<div class="col s4">'+\
-	'		<b class="orange-text">Start:</b> '+o['@startstr']+'<br>'+\
-	'		<b class="orange-text">Scan Type:</b> '+o['scaninfo']['@type']+'<br>'+\
-	'		<b class="orange-text">Scan Protocol:</b> '+o['scaninfo']['@protocol']+'<br>'+\
+	'		<b class="orange-text">Start:</b> '+esc(o['@startstr'])+'<br>'+\
+	'		<b class="orange-text">Scan Type:</b> '+esc(o['scaninfo']['@type'])+'<br>'+\
+	'		<b class="orange-text">Scan Protocol:</b> '+esc(o['scaninfo']['@protocol'])+'<br>'+\
 	'		<b class="orange-text">Nmap Command:</b> <a class="activator" href="#!">view details</a>'+\
 	'	</div>'+\
 	'	<div class="col s4" style="border-left:solid #999 1px;">'+\
@@ -614,10 +614,10 @@ def index(request, filterservice="", filterportid=""):
 	'</div>'
 
 	r['scandetails'] = '<div class="code" style="word-wrap: break-word;overflow-wrap: break-word;">'+\
-	'	<p>'+o['@args']+'</p>'+\
+	'	<p>'+esc(o['@args'])+'</p>'+\
 	'	<p>'+\
-	'		version: '+o['@version']+'<br>'+\
-	'		xmloutputversion: '+o['@xmloutputversion']+'<br>'+\
+	'		version: '+esc(o['@version'])+'<br>'+\
+	'		xmloutputversion: '+esc(o['@xmloutputversion'])+'<br>'+\
 	'	</p>'+\
 	'</div>'
 		
@@ -633,7 +633,7 @@ def index(request, filterservice="", filterportid=""):
 			else:
 				allss += '<span class="tmlabel" style="background-color:#ffcc00;color:#333;">'+html.escape(i)+'</span>, '
 
-			allsslabels += '"'+html.escape(i)+'", '
+			allsslabels += jsstr(i)+', '
 			allssdata += ''+str(sscount[i])+','
 			allssc = (allssc + 1)
 
@@ -643,17 +643,17 @@ def index(request, filterservice="", filterportid=""):
 	allpic = 1
 	for i in sorted(picount, key=picount.__getitem__, reverse=True):
 		if allpic <= 5:
-			allpilinks += '<a href="/report/portid/'+str(i)+'/">'+str(i)+'</a>, '
-			allpilabels += '"'+html.escape(i)+'", '
+			allpilinks += '<a href="/report/portid/'+esc(i)+'/">'+esc(i)+'</a>, '
+			allpilabels += jsstr(i)+', '
 			allpidata += ''+str(picount[i])+','
 			allpic = (allpic + 1)
 		elif allpic > 5 and allpic <= 10:
-			allpilinks += '<a href="/report/portid/'+str(i)+'/">'+str(i)+'</a>, '
+			allpilinks += '<a href="/report/portid/'+esc(i)+'/">'+esc(i)+'</a>, '
 			allpic = (allpic + 1)
 
 	allostypelinks = ''
 	for i in sorted(allostypelist, key=allostypelist.__getitem__, reverse=True):
-		allostypelinks += '<a href="">'+str(i)+'</a>, '
+		allostypelinks += '<a href="">'+esc(i)+'</a>, '
 
 
 	r['pretable'] = ''

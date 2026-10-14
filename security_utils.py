@@ -246,3 +246,28 @@ def sanitize_notes_content(content, max_length=10000):
             raise ValidationError('Potentially dangerous content detected')
 
     return content
+
+
+def validate_notes_b64(value, max_length=10240):
+    """
+    Validate notes as sent by the UI: urlencoded base64 of UTF-8 text.
+
+    Raises:
+        ValidationError: If notes are too long or not urlencoded base64
+    """
+    if len(value) > max_length:
+        raise ValidationError(f'Notes content too large (max {max_length} bytes)')
+
+    if not re.match(r'^[A-Za-z0-9%+/=]*$', value):
+        raise ValidationError('Invalid notes encoding')
+
+    import base64
+    import binascii
+    from urllib.parse import unquote
+
+    try:
+        base64.b64decode(unquote(value), validate=True).decode('utf-8')
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        raise ValidationError('Invalid notes encoding')
+
+    return value

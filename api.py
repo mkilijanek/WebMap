@@ -3,13 +3,19 @@ from django.http import HttpResponse
 from django.core.exceptions import SuspiciousFileOperation, ValidationError
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
-import xmltodict, json, html, os, hashlib, re, requests, subprocess
+import xmltodict, json, html, os, hashlib, re, requests, subprocess, shutil
 from collections import OrderedDict
-from security_utils import (
+from .security_utils import (
     safe_join, validate_filename, validate_md5_hash,
-    validate_port_number, validate_cpe_string
+    validate_port_number, validate_cpe_string,
+    validate_ip_address, validate_label, validate_object_type,
+    validate_notes_b64
 )
 
+WKHTMLTOPDF = os.environ.get('WKHTMLTOPDF_PATH') or shutil.which('wkhtmltopdf') or '/opt/wkhtmltox/bin/wkhtmltopdf'
+
+@csrf_protect
+@require_http_methods(['POST'])
 def rmNotes(request, hashstr):
 	try:
 		# Validate inputs
@@ -29,8 +35,10 @@ def rmNotes(request, hashstr):
 		else:
 			res = {'error': 'file not found'}
 
-	except (ValidationError, SuspiciousFileOperation) as e:
-		res = {'error': str(e)}
+	except ValidationError as e:
+		res = {'error': ' '.join(e.messages)}
+	except SuspiciousFileOperation:
+		res = {'error': 'invalid path'}
 	except Exception as e:
 		res = {'error': 'operation failed'}
 
@@ -46,9 +54,7 @@ def saveNotes(request):
 		hashstr = validate_md5_hash(request.POST.get('hashstr', ''))
 
 		# Validate notes content (max 10KB)
-		notes_content = request.POST.get('notes', '')
-		if len(notes_content) > 10240:
-			raise ValidationError('Notes content too large (max 10KB)')
+		notes_content = validate_notes_b64(request.POST.get('notes', ''))
 
 		# Safe file path construction
 		notes_dir = '/opt/notes'
@@ -61,17 +67,20 @@ def saveNotes(request):
 
 		res = {'ok': 'notes saved'}
 
-	except (ValidationError, SuspiciousFileOperation) as e:
-		res = {'error': str(e)}
+	except ValidationError as e:
+		res = {'error': ' '.join(e.messages)}
+	except SuspiciousFileOperation:
+		res = {'error': 'invalid path'}
 	except Exception as e:
 		res = {'error': 'operation failed'}
 
 	return HttpResponse(json.dumps(res), content_type="application/json")
 
+@csrf_protect
+@require_http_methods(['POST'])
 def rmlabel(request, objtype, hashstr):
 	try:
 		# Validate inputs
-		from security_utils import validate_object_type
 		objtype = validate_object_type(objtype)
 		scanfile = validate_filename(request.session.get('scanfile', ''))
 		scanfilemd5 = hashlib.md5(scanfile.encode('utf-8')).hexdigest()
@@ -89,17 +98,20 @@ def rmlabel(request, objtype, hashstr):
 		else:
 			res = {'error': 'file not found'}
 
-	except (ValidationError, SuspiciousFileOperation) as e:
-		res = {'error': str(e)}
+	except ValidationError as e:
+		res = {'error': ' '.join(e.messages)}
+	except SuspiciousFileOperation:
+		res = {'error': 'invalid path'}
 	except Exception as e:
 		res = {'error': 'operation failed'}
 
 	return HttpResponse(json.dumps(res), content_type="application/json")
 
+@csrf_protect
+@require_http_methods(['POST'])
 def label(request, objtype, label, hashstr):
 	try:
 		# Validate inputs
-		from security_utils import validate_label, validate_object_type
 		label = validate_label(label)
 		objtype = validate_object_type(objtype)
 		scanfile = validate_filename(request.session.get('scanfile', ''))
@@ -117,8 +129,10 @@ def label(request, objtype, label, hashstr):
 
 		res = {'ok': 'label set', 'label': label}
 
-	except (ValidationError, SuspiciousFileOperation) as e:
-		res = {'error': str(e)}
+	except ValidationError as e:
+		res = {'error': ' '.join(e.messages)}
+	except SuspiciousFileOperation:
+		res = {'error': 'invalid path'}
 	except Exception as e:
 		res = {'error': 'operation failed'}
 
@@ -127,7 +141,6 @@ def label(request, objtype, label, hashstr):
 def port_details(request, address, portid):
 	try:
 		# Validate inputs
-		from security_utils import validate_ip_address
 		address = validate_ip_address(address)
 		portid = str(validate_port_number(portid))
 		scanfile = validate_filename(request.session.get('scanfile', ''))
@@ -142,8 +155,10 @@ def port_details(request, address, portid):
 
 		oo = xmltodict.parse(xml_content, disable_entities=True)
 		o = oo['nmaprun']
-	except (ValidationError, SuspiciousFileOperation) as e:
-		return HttpResponse(json.dumps({'error': str(e)}), content_type="application/json", status=400)
+	except ValidationError as e:
+		return HttpResponse(json.dumps({'error': ' '.join(e.messages)}), content_type="application/json", status=400)
+	except SuspiciousFileOperation:
+		return HttpResponse(json.dumps({'error': 'invalid path'}), content_type="application/json", status=400)
 	except Exception as e:
 		return HttpResponse(json.dumps({'error': 'operation failed'}), content_type="application/json", status=500)
 
@@ -175,6 +190,10 @@ def port_details(request, address, portid):
 				if p['@portid'] == portid:
 					return HttpResponse(json.dumps(p, indent=4), content_type="application/json")
 
+	return HttpResponse(json.dumps({'error': 'not found'}), content_type="application/json", status=404)
+
+@csrf_protect
+@require_http_methods(['POST'])
 def genPDF(request):
 	try:
 		if 'scanfile' not in request.session:
@@ -196,8 +215,9 @@ def genPDF(request):
 		# CRITICAL FIX: Use subprocess instead of os.popen to prevent command injection
 		# Build command as list to avoid shell interpretation
 		cmd = [
-			'/opt/wkhtmltox/bin/wkhtmltopdf',
+			WKHTMLTOPDF,
 			'--cookie', 'sessionid', request.session._session_key,
+			'--disable-local-file-access',
 			'--enable-javascript',
 			'--javascript-delay', '6000',
 			'http://127.0.0.1:8000/view/pdf/',
@@ -217,7 +237,7 @@ def genPDF(request):
 		res = {'ok': 'PDF created', 'file': f'/static/{pdf_filename}'}
 
 	except ValidationError as e:
-		res = {'error': str(e)}
+		res = {'error': ' '.join(e.messages)}
 	except subprocess.TimeoutExpired:
 		res = {'error': 'PDF generation timeout'}
 	except subprocess.CalledProcessError as e:
@@ -232,7 +252,6 @@ def genPDF(request):
 def getCVE(request):
 	try:
 		# Validate inputs
-		from security_utils import validate_ip_address
 		scanfile = validate_filename(request.session.get('scanfile', ''))
 		scanfilemd5 = hashlib.md5(scanfile.encode('utf-8')).hexdigest()
 
@@ -245,7 +264,7 @@ def getCVE(request):
 		# Make external API call with timeout and error handling
 		try:
 			r = requests.get(
-				f'http://cve.circl.lu/api/cvefor/{cpe}',
+				f'https://cve.circl.lu/api/cvefor/{cpe}',
 				timeout=10,  # 10 second timeout
 				headers={'User-Agent': 'WebMap/1.0'}
 			)
@@ -269,8 +288,10 @@ def getCVE(request):
 		else:
 			res = {'info': 'No CVE data found'}
 
-	except (ValidationError, SuspiciousFileOperation) as e:
-		res = {'error': str(e)}
+	except ValidationError as e:
+		res = {'error': ' '.join(e.messages)}
+	except SuspiciousFileOperation:
+		res = {'error': 'invalid path'}
 	except Exception as e:
 		res = {'error': 'operation failed'}
 
