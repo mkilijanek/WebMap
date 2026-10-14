@@ -1,0 +1,9 @@
+.git
+.github
+.sbom
+.env
+.env.*
+docker/xml
+*.md
+__pycache__
+*.pyc

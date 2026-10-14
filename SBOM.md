@@ -136,10 +136,10 @@ WebMap provides SBOM in **two industry-standard formats**:
 
 | Component | Version | License | Purpose | Security |
 |-----------|---------|---------|---------|----------|
-| **Django** | 5.2.9 | BSD-3-Clause | Web framework | ✅ LTS (2025-2028) |
-| **requests** | 2.32.5 | Apache-2.0 | HTTP library | ✅ Latest stable |
-| **xmltodict** | 0.14.2 | MIT | XML parsing | ✅ Updated |
-| **defusedxml** | 0.7.1 | Python-2.0 | Secure XML | ✅ Security lib |
+| **Django** | 5.2.18 | BSD-3-Clause | Web framework | ✅ LTS (2025-2028) |
+| **requests** | 2.34.2 | Apache-2.0 | HTTP library | ✅ Latest stable |
+| **xmltodict** | 1.0.4 | MIT | XML parsing | ✅ Updated |
+| **defusedxml** | 0.7.1 | PSF-2.0 | Secure XML | ✅ Security lib |
 
 ### Transitive Dependencies
 

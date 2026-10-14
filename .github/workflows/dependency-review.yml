@@ -15,33 +15,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Dependency Review
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5.0.0
         with:
-          # Fail on critical and high vulnerabilities
-          fail-on-severity: critical
-
-          # Deny licenses that are not acceptable
-          deny-licenses: GPL-2.0, LGPL-2.0, AGPL-3.0
-
-          # Allow these licenses
-          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
+          # Severity, scopes and license policy live in the config file
+          # (allow-licenses and deny-licenses are mutually exclusive)
+          config-file: './.github/dependency-review-config.yml'
 
           # Comment on PR with results
           comment-summary-in-pr: always
-
-          # CVSS threshold
-          fail-on-scopes: runtime
-
-          # Configuration
-          config-file: './.github/dependency-review-config.yml'
-
-      - name: Upload dependency graph
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: dependency-graph
-          path: dependency-graph.json
-          retention-days: 30

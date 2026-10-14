@@ -5,7 +5,7 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 import xmltodict, json, html, os, hashlib, re, requests, subprocess
 from collections import OrderedDict
-from security_utils import (
+from nmapreport.security_utils import (
     safe_join, validate_filename, validate_md5_hash,
     validate_port_number, validate_cpe_string
 )
@@ -71,7 +71,7 @@ def saveNotes(request):
 def rmlabel(request, objtype, hashstr):
 	try:
 		# Validate inputs
-		from security_utils import validate_object_type
+		from nmapreport.security_utils import validate_object_type
 		objtype = validate_object_type(objtype)
 		scanfile = validate_filename(request.session.get('scanfile', ''))
 		scanfilemd5 = hashlib.md5(scanfile.encode('utf-8')).hexdigest()
@@ -99,7 +99,7 @@ def rmlabel(request, objtype, hashstr):
 def label(request, objtype, label, hashstr):
 	try:
 		# Validate inputs
-		from security_utils import validate_label, validate_object_type
+		from nmapreport.security_utils import validate_label, validate_object_type
 		label = validate_label(label)
 		objtype = validate_object_type(objtype)
 		scanfile = validate_filename(request.session.get('scanfile', ''))
@@ -127,7 +127,7 @@ def label(request, objtype, label, hashstr):
 def port_details(request, address, portid):
 	try:
 		# Validate inputs
-		from security_utils import validate_ip_address
+		from nmapreport.security_utils import validate_ip_address
 		address = validate_ip_address(address)
 		portid = str(validate_port_number(portid))
 		scanfile = validate_filename(request.session.get('scanfile', ''))
@@ -232,7 +232,7 @@ def genPDF(request):
 def getCVE(request):
 	try:
 		# Validate inputs
-		from security_utils import validate_ip_address
+		from nmapreport.security_utils import validate_ip_address
 		scanfile = validate_filename(request.session.get('scanfile', ''))
 		scanfilemd5 = hashlib.md5(scanfile.encode('utf-8')).hexdigest()
 
@@ -245,7 +245,7 @@ def getCVE(request):
 		# Make external API call with timeout and error handling
 		try:
 			r = requests.get(
-				f'http://cve.circl.lu/api/cvefor/{cpe}',
+				f'https://cve.circl.lu/api/cvefor/{cpe}',
 				timeout=10,  # 10 second timeout
 				headers={'User-Agent': 'WebMap/1.0'}
 			)

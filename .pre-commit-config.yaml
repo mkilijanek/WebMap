@@ -6,7 +6,7 @@
 repos:
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -24,7 +24,7 @@ repos:
 
   # Python code formatting
   - repo: https://github.com/psf/black
-    rev: 24.1.1
+    rev: 26.10.1
     hooks:
       - id: black
         language_version: python3
@@ -39,7 +39,7 @@ repos:
 
   # Python linting
   - repo: https://github.com/pycqa/flake8
-    rev: 7.0.0
+    rev: 7.4.1
     hooks:
       - id: flake8
         args: ['--max-line-length=100', '--extend-ignore=E203,W503']
@@ -47,7 +47,7 @@ repos:
 
   # Security - Bandit (Python security linter)
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.7
+    rev: 1.9.4
     hooks:
       - id: bandit
         args: ['-ll', '-i', '--recursive', '--exclude', '.git,.github,venv,env,.venv']
@@ -56,7 +56,7 @@ repos:
 
   # Security - detect-secrets
   - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.4.0
+    rev: v1.5.0
     hooks:
       - id: detect-secrets
         args: ['--baseline', '.secrets.baseline']
@@ -64,30 +64,23 @@ repos:
         description: Detect hardcoded secrets in code
 
   # Security - Safety (check dependencies)
-  - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
-    rev: v1.3.3
-    hooks:
-      - id: python-safety-dependencies-check
-        name: Check dependencies for security vulnerabilities
-        files: requirements.*\.txt$
-
   # Django specific checks
   - repo: https://github.com/adamchainz/django-upgrade
-    rev: 1.16.0
+    rev: 1.33.0
     hooks:
       - id: django-upgrade
-        args: ['--target-version', '4.2']
+        args: ['--target-version', '5.2']
 
   # YAML linting
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.35.1
+    rev: v1.38.0
     hooks:
       - id: yamllint
         args: ['-d', '{extends: default, rules: {line-length: {max: 120}}}']
 
   # Dockerfile linting
   - repo: https://github.com/hadolint/hadolint
-    rev: v2.12.0
+    rev: v2.15.1
     hooks:
       - id: hadolint-docker
         name: Lint Dockerfiles
@@ -95,7 +88,7 @@ repos:
 
   # Shell script linting
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.9.0.6
+    rev: v0.11.0.1
     hooks:
       - id: shellcheck
         name: Check shell scripts

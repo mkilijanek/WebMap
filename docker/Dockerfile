@@ -4,12 +4,14 @@
 # Rev3rse Security: https://www.youtube.com/rev3rsesecurity
 # Author: theMiddle
 # -
-# Usage:
-#   $ cd /opt
-#   $ git clone https://github.com/Rev3rseSecurity/WebMap.git
-#   $ cd WebMap/docker
-#   $ docker build -t webmap:latest .
+# Usage (build context is the repository root):
+#   $ git clone https://github.com/mkilijanek/WebMap.git /opt/WebMap
+#   $ cd /opt/WebMap
+#   $ docker build -f docker/Dockerfile -t webmap:latest .
 #   $ docker run -d -v /opt/WebMap/docker/xml:/opt/xml -p 8000:8000 webmap:latest
+#
+# Production: pass a stable secret so sessions survive restarts
+#   $ docker run ... -e DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" webmap:latest
 #
 # Nmap Example:
 #   $ nmap -sT -A -oX /tmp/myscan.xml 192.168.1.0/24
@@ -17,25 +19,33 @@
 #
 # Now you can point your browser to http://localhost:8000
 
-FROM ubuntu:latest
+FROM ubuntu:24.04
 
-RUN apt-get update && apt-get install -y --allow-downgrades --allow-remove-essential --allow-change-held-packages \
-    python3 python3-pip curl wget git wkhtmltopdf libssl1.0-dev
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
 
-RUN mkdir /opt/xml && mkdir /opt/notes && \
-    wget -P /opt/ https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.4/wkhtmltox-0.12.4_linux-generic-amd64.tar.xz && \
-    cd /opt/ && tar -xvf /opt/wkhtmltox-0.12.4_linux-generic-amd64.tar.xz
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 python3-venv wkhtmltopdf ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install Django requests xmltodict && \
-    cd /opt/ && django-admin startproject nmapdashboard && cd /opt/nmapdashboard && \
-    git clone https://github.com/Rev3rseSecurity/WebMap.git && \
-    mv WebMap nmapreport && cd nmapreport && git checkout v2/master
+# api.py expects wkhtmltopdf under /opt/wkhtmltox/bin
+RUN mkdir -p /opt/xml /opt/notes /opt/wkhtmltox/bin && \
+    ln -s /usr/bin/wkhtmltopdf /opt/wkhtmltox/bin/wkhtmltopdf
 
-COPY settings.py /opt/nmapdashboard/nmapdashboard/
-COPY urls.py /opt/nmapdashboard/nmapdashboard/
+# Pinned, reproducible dependencies
+COPY requirements.txt /tmp/requirements.txt
+RUN python3 -m venv /opt/venv && \
+    pip install --no-cache-dir -r /tmp/requirements.txt
 
-RUN cd /opt/nmapdashboard && python3 manage.py migrate
+# Django project + this repository as the "nmapreport" app
+RUN cd /opt && django-admin startproject nmapdashboard
+COPY . /opt/nmapdashboard/nmapreport/
+COPY docker/settings.py /opt/nmapdashboard/nmapdashboard/settings.py
+COPY docker/urls.py /opt/nmapdashboard/nmapdashboard/urls.py
+
+RUN cd /opt/nmapdashboard && python manage.py migrate
 
 EXPOSE 8000
 
-ENTRYPOINT ["python3", "/opt/nmapdashboard/manage.py", "runserver", "0:8000"]
+ENTRYPOINT ["python", "/opt/nmapdashboard/manage.py", "runserver", "0:8000"]

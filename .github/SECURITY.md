@@ -69,7 +69,6 @@ This repository uses multiple automated security tools:
 - **Bandit**: Python security linter
 - **Trivy**: Comprehensive vulnerability scanner
 - **pip-audit**: Python dependency auditing
-- **Safety**: Known security vulnerability checking
 - **Semgrep**: Static application security testing (SAST)
 - **TruffleHog**: Secret scanning
 

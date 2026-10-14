@@ -89,10 +89,9 @@ updates:
 - Generates JSON and Markdown reports
 - Runs on every push and daily at 2:00 AM UTC
 
-#### b) Safety
-- Checks dependencies against Safety DB
-- 50,000+ known vulnerabilities tracked
-- JSON report generated
+#### b) Safety (removed from CI)
+- Safety CLI 3 (`safety scan`) requires a Safety account/API key, so it no longer runs in CI
+- `pip-audit` covers dependency vulnerabilities; run Safety locally if you have an account
 
 #### c) Bandit
 - Static analysis security linter for Python

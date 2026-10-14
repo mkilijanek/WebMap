@@ -1,8 +1,8 @@
 {
   "components": [
     {
-      "bom-ref": "requirements-L6",
-      "description": "requirements line 6: Django==5.2.9",
+      "bom-ref": "requirements-L5",
+      "description": "requirements line 5: Django==5.2.18",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -11,13 +11,58 @@
         }
       ],
       "name": "Django",
-      "purl": "pkg:pypi/django@5.2.9",
+      "purl": "pkg:pypi/django@5.2.18",
       "type": "library",
-      "version": "5.2.9"
+      "version": "5.2.18"
     },
     {
-      "bom-ref": "requirements-L15",
-      "description": "requirements line 15: defusedxml==0.7.1",
+      "bom-ref": "requirements-L1",
+      "description": "requirements line 1: asgiref==3.12.1",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "type": "distribution",
+          "url": "https://pypi.org/simple/asgiref/"
+        }
+      ],
+      "name": "asgiref",
+      "purl": "pkg:pypi/asgiref@3.12.1",
+      "type": "library",
+      "version": "3.12.1"
+    },
+    {
+      "bom-ref": "requirements-L2",
+      "description": "requirements line 2: certifi==2026.7.22",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "type": "distribution",
+          "url": "https://pypi.org/simple/certifi/"
+        }
+      ],
+      "name": "certifi",
+      "purl": "pkg:pypi/certifi@2026.7.22",
+      "type": "library",
+      "version": "2026.7.22"
+    },
+    {
+      "bom-ref": "requirements-L3",
+      "description": "requirements line 3: charset-normalizer==3.5.2",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "type": "distribution",
+          "url": "https://pypi.org/simple/charset-normalizer/"
+        }
+      ],
+      "name": "charset-normalizer",
+      "purl": "pkg:pypi/charset-normalizer@3.5.2",
+      "type": "library",
+      "version": "3.5.2"
+    },
+    {
+      "bom-ref": "requirements-L4",
+      "description": "requirements line 4: defusedxml==0.7.1",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -31,8 +76,23 @@
       "version": "0.7.1"
     },
     {
-      "bom-ref": "requirements-L9",
-      "description": "requirements line 9: requests==2.32.5",
+      "bom-ref": "requirements-L6",
+      "description": "requirements line 6: idna==3.20",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "type": "distribution",
+          "url": "https://pypi.org/simple/idna/"
+        }
+      ],
+      "name": "idna",
+      "purl": "pkg:pypi/idna@3.20",
+      "type": "library",
+      "version": "3.20"
+    },
+    {
+      "bom-ref": "requirements-L7",
+      "description": "requirements line 7: requests==2.34.2",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -41,13 +101,43 @@
         }
       ],
       "name": "requests",
-      "purl": "pkg:pypi/requests@2.32.5",
+      "purl": "pkg:pypi/requests@2.34.2",
       "type": "library",
-      "version": "2.32.5"
+      "version": "2.34.2"
     },
     {
-      "bom-ref": "requirements-L12",
-      "description": "requirements line 12: xmltodict==0.14.2",
+      "bom-ref": "requirements-L8",
+      "description": "requirements line 8: sqlparse==0.6.0",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "type": "distribution",
+          "url": "https://pypi.org/simple/sqlparse/"
+        }
+      ],
+      "name": "sqlparse",
+      "purl": "pkg:pypi/sqlparse@0.6.0",
+      "type": "library",
+      "version": "0.6.0"
+    },
+    {
+      "bom-ref": "requirements-L9",
+      "description": "requirements line 9: urllib3==2.8.0",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "type": "distribution",
+          "url": "https://pypi.org/simple/urllib3/"
+        }
+      ],
+      "name": "urllib3",
+      "purl": "pkg:pypi/urllib3@2.8.0",
+      "type": "library",
+      "version": "2.8.0"
+    },
+    {
+      "bom-ref": "requirements-L10",
+      "description": "requirements line 10: xmltodict==1.0.4",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -56,27 +146,45 @@
         }
       ],
       "name": "xmltodict",
-      "purl": "pkg:pypi/xmltodict@0.14.2",
+      "purl": "pkg:pypi/xmltodict@1.0.4",
       "type": "library",
-      "version": "0.14.2"
+      "version": "1.0.4"
     }
   ],
   "dependencies": [
     {
-      "ref": "requirements-L12"
+      "ref": "requirements-L1"
     },
     {
-      "ref": "requirements-L15"
+      "ref": "requirements-L10"
+    },
+    {
+      "ref": "requirements-L2"
+    },
+    {
+      "ref": "requirements-L3"
+    },
+    {
+      "ref": "requirements-L4"
+    },
+    {
+      "ref": "requirements-L5"
     },
     {
       "ref": "requirements-L6"
+    },
+    {
+      "ref": "requirements-L7"
+    },
+    {
+      "ref": "requirements-L8"
     },
     {
       "ref": "requirements-L9"
     }
   ],
   "metadata": {
-    "timestamp": "2025-12-20T18:59:41.172752+00:00",
+    "timestamp": "2026-10-14T14:18:55.407135+00:00",
     "tools": {
       "components": [
         {
@@ -126,7 +234,7 @@
           ],
           "name": "cyclonedx-py",
           "type": "application",
-          "version": "7.2.1"
+          "version": "7.5.0"
         },
         {
           "description": "Python library for CycloneDX",
@@ -175,12 +283,12 @@
           ],
           "name": "cyclonedx-python-lib",
           "type": "library",
-          "version": "11.6.0"
+          "version": "11.12.0"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:db62e30a-f97f-42ef-a147-bcebe9b8489a",
+  "serialNumber": "urn:uuid:f47500ad-7ed5-44e8-bbe1-a0f2c91a9466",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",

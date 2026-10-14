@@ -3,9 +3,9 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "WebMap-2.0",
-  "documentNamespace": "https://github.com/mkilijanek/WebMap/sbom/spdx-2.3-2025-12-20",
+  "documentNamespace": "https://github.com/mkilijanek/WebMap/sbom/spdx-2.3-2026-10-14",
   "creationInfo": {
-    "created": "2025-12-20T12:00:00Z",
+    "created": "2026-10-14T14:30:00Z",
     "creators": [
       "Tool: spdx-tools",
       "Organization: WebMap Project",
@@ -22,7 +22,7 @@
       "filesAnalyzed": false,
       "homepage": "https://github.com/mkilijanek/WebMap",
       "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "Apache-2.0",
+      "licenseDeclared": "GPL-3.0-only",
       "copyrightText": "NOASSERTION",
       "description": "A Web Dashboard for Nmap XML Report - Security assessment tool for visualizing network scan results",
       "primaryPackagePurpose": "APPLICATION",
@@ -35,69 +35,53 @@
       ]
     },
     {
-      "SPDXID": "SPDXRef-Package-Django",
-      "name": "Django",
-      "versionInfo": "5.2.9",
-      "downloadLocation": "https://pypi.org/project/Django/5.2.9/",
+      "SPDXID": "SPDXRef-Package-asgiref",
+      "name": "asgiref",
+      "versionInfo": "3.12.1",
+      "downloadLocation": "https://pypi.org/project/asgiref/3.12.1/",
       "filesAnalyzed": false,
-      "homepage": "https://www.djangoproject.com/",
       "licenseConcluded": "BSD-3-Clause",
       "licenseDeclared": "BSD-3-Clause",
-      "copyrightText": "Copyright Django Software Foundation and individual contributors",
-      "description": "A high-level Python Web framework that encourages rapid development and clean, pragmatic design. LTS version with security updates until April 2028.",
+      "copyrightText": "NOASSERTION",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
-          "referenceLocator": "pkg:pypi/django@5.2.9"
-        },
-        {
-          "referenceCategory": "SECURITY",
-          "referenceType": "cpe23Type",
-          "referenceLocator": "cpe:2.3:a:djangoproject:django:5.2.9:*:*:*:lts:*:*:*"
+          "referenceLocator": "pkg:pypi/asgiref@3.12.1"
         }
       ]
     },
     {
-      "SPDXID": "SPDXRef-Package-requests",
-      "name": "requests",
-      "versionInfo": "2.32.5",
-      "downloadLocation": "https://pypi.org/project/requests/2.32.5/",
+      "SPDXID": "SPDXRef-Package-certifi",
+      "name": "certifi",
+      "versionInfo": "2026.7.22",
+      "downloadLocation": "https://pypi.org/project/certifi/2026.7.22/",
       "filesAnalyzed": false,
-      "homepage": "https://requests.readthedocs.io/",
-      "licenseConcluded": "Apache-2.0",
-      "licenseDeclared": "Apache-2.0",
-      "copyrightText": "Copyright Kenneth Reitz and contributors",
-      "description": "Python HTTP for Humans - simple, elegant HTTP library",
+      "licenseConcluded": "MPL-2.0",
+      "licenseDeclared": "MPL-2.0",
+      "copyrightText": "NOASSERTION",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
-          "referenceLocator": "pkg:pypi/requests@2.32.5"
-        },
-        {
-          "referenceCategory": "SECURITY",
-          "referenceType": "cpe23Type",
-          "referenceLocator": "cpe:2.3:a:python:requests:2.32.5:*:*:*:*:*:*:*"
+          "referenceLocator": "pkg:pypi/certifi@2026.7.22"
         }
       ]
     },
     {
-      "SPDXID": "SPDXRef-Package-xmltodict",
-      "name": "xmltodict",
-      "versionInfo": "0.14.2",
-      "downloadLocation": "https://pypi.org/project/xmltodict/0.14.2/",
+      "SPDXID": "SPDXRef-Package-charset-normalizer",
+      "name": "charset-normalizer",
+      "versionInfo": "3.5.2",
+      "downloadLocation": "https://pypi.org/project/charset-normalizer/3.5.2/",
       "filesAnalyzed": false,
-      "homepage": "https://github.com/martinblech/xmltodict",
       "licenseConcluded": "MIT",
       "licenseDeclared": "MIT",
-      "copyrightText": "Copyright Martin Blech and contributors",
-      "description": "Makes working with XML feel like you are working with JSON",
+      "copyrightText": "NOASSERTION",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
-          "referenceLocator": "pkg:pypi/xmltodict@0.14.2"
+          "referenceLocator": "pkg:pypi/charset-normalizer@3.5.2"
         }
       ]
     },
@@ -107,18 +91,122 @@
       "versionInfo": "0.7.1",
       "downloadLocation": "https://pypi.org/project/defusedxml/0.7.1/",
       "filesAnalyzed": false,
-      "homepage": "https://github.com/tiran/defusedxml",
-      "licenseConcluded": "Python-2.0",
-      "licenseDeclared": "Python-2.0",
-      "copyrightText": "Copyright Christian Heimes and contributors",
-      "description": "XML bomb protection for Python stdlib modules",
+      "licenseConcluded": "PSF-2.0",
+      "licenseDeclared": "PSF-2.0",
+      "copyrightText": "NOASSERTION",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
           "referenceLocator": "pkg:pypi/defusedxml@0.7.1"
         }
+      ],
+      "homepage": "https://github.com/tiran/defusedxml"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-Django",
+      "name": "Django",
+      "versionInfo": "5.2.18",
+      "downloadLocation": "https://pypi.org/project/Django/5.2.18/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/django@5.2.18"
+        }
+      ],
+      "homepage": "https://www.djangoproject.com/"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-idna",
+      "name": "idna",
+      "versionInfo": "3.20",
+      "downloadLocation": "https://pypi.org/project/idna/3.20/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/idna@3.20"
+        }
       ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-requests",
+      "name": "requests",
+      "versionInfo": "2.34.2",
+      "downloadLocation": "https://pypi.org/project/requests/2.34.2/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/requests@2.34.2"
+        }
+      ],
+      "homepage": "https://requests.readthedocs.io"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-sqlparse",
+      "name": "sqlparse",
+      "versionInfo": "0.6.0",
+      "downloadLocation": "https://pypi.org/project/sqlparse/0.6.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/sqlparse@0.6.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-urllib3",
+      "name": "urllib3",
+      "versionInfo": "2.8.0",
+      "downloadLocation": "https://pypi.org/project/urllib3/2.8.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/urllib3@2.8.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-xmltodict",
+      "name": "xmltodict",
+      "versionInfo": "1.0.4",
+      "downloadLocation": "https://pypi.org/project/xmltodict/1.0.4/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/xmltodict@1.0.4"
+        }
+      ],
+      "homepage": "https://github.com/martinblech/xmltodict"
     }
   ],
   "relationships": [
@@ -126,6 +214,11 @@
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
       "relatedSpdxElement": "SPDXRef-Package-WebMap"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-WebMap",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-defusedxml"
     },
     {
       "spdxElementId": "SPDXRef-Package-WebMap",
@@ -143,9 +236,34 @@
       "relatedSpdxElement": "SPDXRef-Package-xmltodict"
     },
     {
-      "spdxElementId": "SPDXRef-Package-WebMap",
+      "spdxElementId": "SPDXRef-Package-Django",
       "relationshipType": "DEPENDS_ON",
-      "relatedSpdxElement": "SPDXRef-Package-defusedxml"
+      "relatedSpdxElement": "SPDXRef-Package-asgiref"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-Django",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-sqlparse"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-requests",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-certifi"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-requests",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-charset-normalizer"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-requests",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-idna"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-requests",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-urllib3"
     }
   ]
 }

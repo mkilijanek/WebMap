@@ -60,9 +60,9 @@ git pull
 The updated `requirements.txt` includes:
 
 ```txt
-Django==4.2.15          # Updated for security
-requests==2.32.5        # Latest stable
-xmltodict==0.14.2       # Security fixes
+Django==5.2.18         # 5.2 LTS
+requests==2.34.2
+xmltodict==1.0.4
 defusedxml==0.7.1       # NEW: XXE protection
 ```
 

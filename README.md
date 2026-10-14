@@ -17,7 +17,7 @@ A Web Dashbord for Nmap XML Report
     <img src="https://img.shields.io/badge/dependabot-enabled-success.svg" alt="Dependabot">
   </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License">
+    <img src="https://img.shields.io/badge/license-GPL%203.0-blue.svg" alt="License">
   </a>
 </p>
 
@@ -117,10 +117,10 @@ SBOM is automatically generated on:
 
 | Component | Version | License | Purpose |
 |-----------|---------|---------|---------|
-| Django | 5.2.9 | BSD-3-Clause | Web framework (LTS) |
-| requests | 2.32.5 | Apache-2.0 | HTTP library |
-| xmltodict | 0.14.2 | MIT | XML parsing |
-| defusedxml | 0.7.1 | Python-2.0 | Secure XML |
+| Django | 5.2.18 | BSD-3-Clause | Web framework (LTS) |
+| requests | 2.34.2 | Apache-2.0 | HTTP library |
+| xmltodict | 1.0.4 | MIT | XML parsing |
+| defusedxml | 0.7.1 | PSF-2.0 | Secure XML |
 
 ### Using the SBOM
 

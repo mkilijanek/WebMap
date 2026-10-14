@@ -23,10 +23,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
 
@@ -38,9 +38,17 @@ jobs:
       - name: Create SBOM directory
         run: mkdir -p .sbom
 
+      - name: Resolve full dependency tree (direct + transitive)
+        run: |
+          python -m venv /tmp/sbom-env
+          /tmp/sbom-env/bin/pip install -r requirements.txt
+          # pip freeze omits pip/setuptools, so only application dependencies remain
+          /tmp/sbom-env/bin/pip freeze > /tmp/resolved-requirements.txt
+          cat /tmp/resolved-requirements.txt
+
       - name: Generate CycloneDX SBOM (JSON)
         run: |
-          cyclonedx-py requirements requirements.txt \
+          cyclonedx-py requirements /tmp/resolved-requirements.txt \
             --of JSON \
             --sv 1.6 \
             --mc-type application \
@@ -48,7 +56,7 @@ jobs:
 
       - name: Generate CycloneDX SBOM (XML)
         run: |
-          cyclonedx-py requirements requirements.txt \
+          cyclonedx-py requirements /tmp/resolved-requirements.txt \
             --of XML \
             --sv 1.6 \
             --mc-type application \
@@ -83,7 +91,7 @@ jobs:
           jq -r '.components[] | "| \(.name) | \(.version) | \(.type) |"' .sbom/sbom.cyclonedx.json >> $GITHUB_STEP_SUMMARY
 
       - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-files
           path: |
@@ -103,7 +111,7 @@ jobs:
 
       - name: Attach SBOM to release
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             .sbom/sbom.cyclonedx.json
@@ -117,16 +125,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download SBOM artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: sbom-files
           path: .sbom
 
       - name: Scan with Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'sbom'
           scan-ref: '.sbom/sbom.cyclonedx.json'
@@ -135,7 +143,7 @@ jobs:
           severity: 'CRITICAL,HIGH,MEDIUM'
 
       - name: Upload Trivy SBOM scan results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'trivy-sbom-results.sarif'
@@ -152,7 +160,7 @@ jobs:
           ./osv-scanner --sbom=.sbom/sbom.cyclonedx.json --format=sarif --output=osv-sbom-results.sarif || true
 
       - name: Upload OSV scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: osv-sbom-scan

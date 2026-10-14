@@ -214,3 +214,16 @@ pip install -r requirements.txt
 **Prepared by:** Security Analysis Bot
 **Date:** 2025-12-20
 **Status:** ✅ Ready for deployment
+
+---
+
+## Addendum (2026-10-14): component refresh
+
+| Package | Before | After |
+|---------|--------|-------|
+| Django | 5.2.9 | 5.2.18 (still 5.2 LTS; 6.x deliberately not adopted, it is not LTS) |
+| requests | 2.32.5 | 2.34.2 |
+| xmltodict | 0.14.2 | 1.0.4 (`parse(..., disable_entities=True)` is still the default) |
+| defusedxml | 0.7.1 | 0.7.1 (already latest) |
+
+`pip-audit -r requirements.txt` reports no known vulnerabilities for this set.

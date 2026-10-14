@@ -37,17 +37,18 @@ updates:
     allow:
       - dependency-type: "all"
 
-    # Ignore specific dependencies (if needed)
-    # ignore:
-    #   - dependency-name: "requests"
-    #     versions: ["2.x"]
+    # Stay on the Django 5.2 LTS line (security support until April 2028);
+    # non-LTS major releases (6.x) are intentionally not proposed.
+    ignore:
+      - dependency-name: "django"
+        update-types: ["version-update:semver-major"]
 
     # Auto-merge security updates (requires GitHub Actions workflow)
     # See: .github/workflows/dependabot-auto-merge.yml
 
   # Docker dependencies
   - package-ecosystem: "docker"
-    directory: "/"
+    directory: "/docker"
     schedule:
       interval: "weekly"
       day: "monday"
