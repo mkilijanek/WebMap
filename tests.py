@@ -407,9 +407,9 @@ class ContentSecurityPolicyTests(ScanDataTests):
 		for url in ['/', '/10.0.0.5/', '/service/http/', '/portid/80/']:
 			body = self.get(url)
 			# only non-executable JSON data blocks and external files
-			for tag in re.findall(r'<script\b[^>]*>', body):
+			for tag in re.findall(r'<script\b[^>]*>', body, re.IGNORECASE):
 				self.assertTrue('src="/static/' in tag or 'type="application/json"' in tag, (url, tag))
-			self.assertNotRegex(body, r'<[^>]*\son[a-z]+=', url)
+			self.assertIsNone(re.search(r'<[^>]*\son[a-z]+=', body, re.IGNORECASE), url)
 			self.assertNotIn('javascript:', body, url)
 
 	def test_no_third_party_assets(self):

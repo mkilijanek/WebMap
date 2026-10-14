@@ -16,13 +16,18 @@ def _key(kind, value):
 	return 'webmap-login:%s:%s' % (kind, hashlib.sha256(value.encode('utf-8')).hexdigest())
 
 
+def _oneline(value):
+	# Values from the request go into log lines: no line breaks.
+	return str(value).replace('\r', '').replace('\n', '')
+
+
 def _client(request):
 	# REMOTE_ADDR only: X-Forwarded-For can be set by anyone.
-	return request.META.get('REMOTE_ADDR', '')
+	return _oneline(request.META.get('REMOTE_ADDR', ''))
 
 
 def _username(request):
-	return request.POST.get('username', '').strip().lower()[:150]
+	return _oneline(request.POST.get('username', '').strip().lower()[:150])
 
 
 class ThrottledLoginView(LoginView):
@@ -54,5 +59,5 @@ class ThrottledLoginView(LoginView):
 
 	def form_valid(self, form):
 		cache.delete_many(self._keys())
-		logger.info('login succeeded user=%r addr=%s', form.get_user().get_username(), _client(self.request))
+		logger.info('login succeeded user=%r addr=%s', _oneline(form.get_user().get_username()), _client(self.request))
 		return super().form_valid(form)
