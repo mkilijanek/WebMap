@@ -1,0 +1,10 @@
+# Project metadata. WebMap is deployed as a Django app inside the container
+# built by docker/Dockerfile, not installed as a package; this file names the
+# project for tooling (e.g. the root component of the SBOM in .sbom/).
+# Runtime dependencies are pinned in requirements.txt.
+[project]
+name = "webmap"
+version = "2.0.0"
+description = "Web dashboard for Nmap XML reports"
+license = "GPL-3.0-only"
+requires-python = ">=3.12"

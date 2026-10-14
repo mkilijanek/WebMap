@@ -14,10 +14,6 @@ updates:
       timezone: "UTC"
     open-pull-requests-limit: 10
 
-    # Reviewers for dependency PRs
-    reviewers:
-      - "mkilijanek"
-
     # Labels for dependency PRs
     labels:
       - "dependencies"
@@ -37,17 +33,9 @@ updates:
     allow:
       - dependency-type: "all"
 
-    # Ignore specific dependencies (if needed)
-    # ignore:
-    #   - dependency-name: "requests"
-    #     versions: ["2.x"]
-
-    # Auto-merge security updates (requires GitHub Actions workflow)
-    # See: .github/workflows/dependabot-auto-merge.yml
-
-  # Docker dependencies
+  # Docker base image (docker/Dockerfile)
   - package-ecosystem: "docker"
-    directory: "/"
+    directory: "/docker"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -77,15 +65,6 @@ updates:
     commit-message:
       prefix: "⚙️ ci"
 
-# Security updates are prioritized automatically by Dependabot
-# Vulnerabilities are checked against:
-# - GitHub Advisory Database
-# - National Vulnerability Database (NVD)
-# - npm Security advisories
-# - PyPI Advisory Database
-
-# Configuration for Dependabot security updates:
-# - CRITICAL: Opened immediately
-# - HIGH: Opened within 24 hours
-# - MEDIUM: Opened within 7 days
-# - LOW: Opened within 30 days
+# Review requests come from .github/CODEOWNERS (the 'reviewers' key is
+# deprecated). Patch updates are auto-merged once required checks pass, see
+# .github/workflows/dependabot-auto-merge.yml.

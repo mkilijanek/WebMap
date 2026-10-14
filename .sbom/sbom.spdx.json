@@ -2,150 +2,292 @@
   "spdxVersion": "SPDX-2.3",
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
-  "name": "WebMap-2.0",
-  "documentNamespace": "https://github.com/mkilijanek/WebMap/sbom/spdx-2.3-2025-12-20",
+  "name": "webmap",
+  "documentNamespace": "http://trivy.dev/application/webmap-7487e11a-de60-4c6e-985a-60978b7b04fa",
   "creationInfo": {
-    "created": "2025-12-20T12:00:00Z",
     "creators": [
-      "Tool: spdx-tools",
-      "Organization: WebMap Project",
-      "Person: Security Analysis Bot"
+      "Organization: aquasecurity",
+      "Tool: trivy-0.76.0"
     ],
-    "licenseListVersion": "3.22"
+    "created": "2026-10-14T23:12:09Z"
   },
   "packages": [
     {
-      "SPDXID": "SPDXRef-Package-WebMap",
-      "name": "WebMap",
-      "versionInfo": "2.0",
-      "downloadLocation": "git+https://github.com/mkilijanek/WebMap",
-      "filesAnalyzed": false,
-      "homepage": "https://github.com/mkilijanek/WebMap",
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "Apache-2.0",
-      "copyrightText": "NOASSERTION",
-      "description": "A Web Dashboard for Nmap XML Report - Security assessment tool for visualizing network scan results",
-      "primaryPackagePurpose": "APPLICATION",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceType": "purl",
-          "referenceLocator": "pkg:github/mkilijanek/WebMap@2.0"
-        }
-      ]
-    },
-    {
-      "SPDXID": "SPDXRef-Package-Django",
       "name": "Django",
-      "versionInfo": "5.2.9",
-      "downloadLocation": "https://pypi.org/project/Django/5.2.9/",
+      "SPDXID": "SPDXRef-Package-8c94e099823ff53b",
+      "versionInfo": "6.1.2",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NONE",
       "filesAnalyzed": false,
-      "homepage": "https://www.djangoproject.com/",
       "licenseConcluded": "BSD-3-Clause",
       "licenseDeclared": "BSD-3-Clause",
-      "copyrightText": "Copyright Django Software Foundation and individual contributors",
-      "description": "A high-level Python Web framework that encourages rapid development and clean, pragmatic design. LTS version with security updates until April 2028.",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
-          "referenceLocator": "pkg:pypi/django@5.2.9"
-        },
-        {
-          "referenceCategory": "SECURITY",
-          "referenceType": "cpe23Type",
-          "referenceLocator": "cpe:2.3:a:djangoproject:django:5.2.9:*:*:*:lts:*:*:*"
+          "referenceLocator": "pkg:pypi/django@6.1.2"
         }
-      ]
+      ],
+      "primaryPackagePurpose": "LIBRARY"
     },
     {
-      "SPDXID": "SPDXRef-Package-requests",
-      "name": "requests",
-      "versionInfo": "2.32.5",
-      "downloadLocation": "https://pypi.org/project/requests/2.32.5/",
+      "name": "asgiref",
+      "SPDXID": "SPDXRef-Package-ad7136886d38c4b5",
+      "versionInfo": "3.12.1",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NONE",
       "filesAnalyzed": false,
-      "homepage": "https://requests.readthedocs.io/",
-      "licenseConcluded": "Apache-2.0",
-      "licenseDeclared": "Apache-2.0",
-      "copyrightText": "Copyright Kenneth Reitz and contributors",
-      "description": "Python HTTP for Humans - simple, elegant HTTP library",
+      "licenseConcluded": "BSD-3-Clause AND LicenseRef-777042425f318e77",
+      "licenseDeclared": "BSD-3-Clause AND LicenseRef-777042425f318e77",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
-          "referenceLocator": "pkg:pypi/requests@2.32.5"
-        },
-        {
-          "referenceCategory": "SECURITY",
-          "referenceType": "cpe23Type",
-          "referenceLocator": "cpe:2.3:a:python:requests:2.32.5:*:*:*:*:*:*:*"
+          "referenceLocator": "pkg:pypi/asgiref@3.12.1"
         }
-      ]
+      ],
+      "primaryPackagePurpose": "LIBRARY"
     },
     {
-      "SPDXID": "SPDXRef-Package-xmltodict",
-      "name": "xmltodict",
-      "versionInfo": "0.14.2",
-      "downloadLocation": "https://pypi.org/project/xmltodict/0.14.2/",
+      "name": "certifi",
+      "SPDXID": "SPDXRef-Package-a80142c6ba22c7ab",
+      "versionInfo": "2026.7.22",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NONE",
       "filesAnalyzed": false,
-      "homepage": "https://github.com/martinblech/xmltodict",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/certifi@2026.7.22"
+        }
+      ],
+      "primaryPackagePurpose": "LIBRARY"
+    },
+    {
+      "name": "charset-normalizer",
+      "SPDXID": "SPDXRef-Package-761ca908d9159a41",
+      "versionInfo": "3.5.2",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NONE",
+      "filesAnalyzed": false,
       "licenseConcluded": "MIT",
       "licenseDeclared": "MIT",
-      "copyrightText": "Copyright Martin Blech and contributors",
-      "description": "Makes working with XML feel like you are working with JSON",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
-          "referenceLocator": "pkg:pypi/xmltodict@0.14.2"
+          "referenceLocator": "pkg:pypi/charset-normalizer@3.5.2"
         }
-      ]
+      ],
+      "primaryPackagePurpose": "LIBRARY"
     },
     {
-      "SPDXID": "SPDXRef-Package-defusedxml",
-      "name": "defusedxml",
-      "versionInfo": "0.7.1",
-      "downloadLocation": "https://pypi.org/project/defusedxml/0.7.1/",
+      "name": "gunicorn",
+      "SPDXID": "SPDXRef-Package-e15250329ad65794",
+      "versionInfo": "23.0.0",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NONE",
       "filesAnalyzed": false,
-      "homepage": "https://github.com/tiran/defusedxml",
-      "licenseConcluded": "Python-2.0",
-      "licenseDeclared": "Python-2.0",
-      "copyrightText": "Copyright Christian Heimes and contributors",
-      "description": "XML bomb protection for Python stdlib modules",
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
           "referenceType": "purl",
-          "referenceLocator": "pkg:pypi/defusedxml@0.7.1"
+          "referenceLocator": "pkg:pypi/gunicorn@23.0.0"
         }
-      ]
+      ],
+      "primaryPackagePurpose": "LIBRARY"
+    },
+    {
+      "name": "idna",
+      "SPDXID": "SPDXRef-Package-dc66e7d9416ddd45",
+      "versionInfo": "3.20",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NONE",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/idna@3.20"
+        }
+      ],
+      "primaryPackagePurpose": "LIBRARY"
+    },
+    {
+      "name": "packaging",
+      "SPDXID": "SPDXRef-Package-21a3ba626c164548",
+      "versionInfo": "26.3",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NONE",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0 OR BSD-2-Clause",
+      "licenseDeclared": "Apache-2.0 OR BSD-2-Clause",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/packaging@26.3"
+        }
+      ],
+      "primaryPackagePurpose": "LIBRARY"
+    },
+    {
+      "name": "pip",
+      "SPDXID": "SPDXRef-Package-dbad7f7f037df17",
+      "versionInfo": "26.2.1",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NONE",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/pip@26.2.1"
+        }
+      ],
+      "primaryPackagePurpose": "LIBRARY"
+    },
+    {
+      "name": "requests",
+      "SPDXID": "SPDXRef-Package-9196f65ac463f43e",
+      "versionInfo": "2.34.2",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NONE",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0 AND LicenseRef-38f0b98d16e6bef",
+      "licenseDeclared": "Apache-2.0 AND LicenseRef-38f0b98d16e6bef",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/requests@2.34.2"
+        }
+      ],
+      "primaryPackagePurpose": "LIBRARY"
+    },
+    {
+      "name": "sqlparse",
+      "SPDXID": "SPDXRef-Package-a71ec1faebabf649",
+      "versionInfo": "0.6.0",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NONE",
+      "filesAnalyzed": false,
+      "licenseConcluded": "LicenseRef-777042425f318e77",
+      "licenseDeclared": "LicenseRef-777042425f318e77",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/sqlparse@0.6.0"
+        }
+      ],
+      "primaryPackagePurpose": "LIBRARY"
+    },
+    {
+      "name": "urllib3",
+      "SPDXID": "SPDXRef-Package-7f27362042cbda40",
+      "versionInfo": "2.8.0",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NONE",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/urllib3@2.8.0"
+        }
+      ],
+      "primaryPackagePurpose": "LIBRARY"
+    },
+    {
+      "name": "xmltodict",
+      "SPDXID": "SPDXRef-Package-6cd24602ef8e3dab",
+      "versionInfo": "1.0.4",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "NONE",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:pypi/xmltodict@1.0.4"
+        }
+      ],
+      "primaryPackagePurpose": "LIBRARY"
+    },
+    {
+      "name": "webmap",
+      "SPDXID": "SPDXRef-Application-6721c90f988e25a4",
+      "downloadLocation": "NONE",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "primaryPackagePurpose": "SOURCE"
+    }
+  ],
+  "hasExtractedLicensingInfos": [
+    {
+      "licenseId": "LicenseRef-38f0b98d16e6bef",
+      "extractedText": "This component is licensed under \"License-::-OSI-Approved-::-Apache-Software-License\"",
+      "name": "License-::-OSI-Approved-::-Apache-Software-License"
+    },
+    {
+      "licenseId": "LicenseRef-777042425f318e77",
+      "extractedText": "This component is licensed under \"License-::-OSI-Approved-::-BSD-License\"",
+      "name": "License-::-OSI-Approved-::-BSD-License"
     }
   ],
   "relationships": [
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
-      "relationshipType": "DESCRIBES",
-      "relatedSpdxElement": "SPDXRef-Package-WebMap"
+      "relatedSpdxElement": "SPDXRef-Application-6721c90f988e25a4",
+      "relationshipType": "DESCRIBES"
     },
     {
-      "spdxElementId": "SPDXRef-Package-WebMap",
-      "relationshipType": "DEPENDS_ON",
-      "relatedSpdxElement": "SPDXRef-Package-Django"
+      "spdxElementId": "SPDXRef-Package-8c94e099823ff53b",
+      "relatedSpdxElement": "SPDXRef-Package-a71ec1faebabf649",
+      "relationshipType": "DEPENDS_ON"
     },
     {
-      "spdxElementId": "SPDXRef-Package-WebMap",
-      "relationshipType": "DEPENDS_ON",
-      "relatedSpdxElement": "SPDXRef-Package-requests"
+      "spdxElementId": "SPDXRef-Package-8c94e099823ff53b",
+      "relatedSpdxElement": "SPDXRef-Package-ad7136886d38c4b5",
+      "relationshipType": "DEPENDS_ON"
     },
     {
-      "spdxElementId": "SPDXRef-Package-WebMap",
-      "relationshipType": "DEPENDS_ON",
-      "relatedSpdxElement": "SPDXRef-Package-xmltodict"
+      "spdxElementId": "SPDXRef-Package-9196f65ac463f43e",
+      "relatedSpdxElement": "SPDXRef-Package-761ca908d9159a41",
+      "relationshipType": "DEPENDS_ON"
     },
     {
-      "spdxElementId": "SPDXRef-Package-WebMap",
-      "relationshipType": "DEPENDS_ON",
-      "relatedSpdxElement": "SPDXRef-Package-defusedxml"
+      "spdxElementId": "SPDXRef-Package-9196f65ac463f43e",
+      "relatedSpdxElement": "SPDXRef-Package-7f27362042cbda40",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-9196f65ac463f43e",
+      "relatedSpdxElement": "SPDXRef-Package-a80142c6ba22c7ab",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-9196f65ac463f43e",
+      "relatedSpdxElement": "SPDXRef-Package-dc66e7d9416ddd45",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-e15250329ad65794",
+      "relatedSpdxElement": "SPDXRef-Package-21a3ba626c164548",
+      "relationshipType": "DEPENDS_ON"
     }
   ]
 }

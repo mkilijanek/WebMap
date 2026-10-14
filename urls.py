@@ -9,7 +9,6 @@ urlpatterns = [
 	path('', login_required(views.index), name='index'),
 	path('setscanfile/<scanfile>', login_required(views.setscanfile), name='setscanfile'),
 	path('<address>/', login_required(views.details), name='details'),
-	path('port/<port>/', login_required(views.port), name='port'),
 	path('service/<filterservice>/', login_required(views.index), name='service'),
 	path('portid/<filterportid>/', login_required(views.index), name='portid'),
 	path('api/setlabel/<objtype>/<label>/<hashstr>/', login_required(api.label), name='api_label'),

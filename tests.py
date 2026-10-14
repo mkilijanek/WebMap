@@ -1,13 +1,16 @@
-import base64, glob, json, os, stat, tempfile, urllib.parse, unittest
+import base64, glob, json, os, re, shutil, stat, tempfile, urllib.parse, unittest
 import unittest.mock as mock
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.core.exceptions import SuspiciousFileOperation
 from django.core.exceptions import ValidationError
 from django.test import TestCase, Client
 from django.urls import resolve
 from nmapreport import api
+from nmapreport import scan as scandata
 from nmapreport.functions import esc, jsstr, safeurl, safenotesb64, notestohtml, shellcmd
 from nmapreport.scan import host_address, filter_cves, load_scan, md5
-from nmapreport.security_utils import validate_notes_b64, validate_cpe_string, validate_ip_address, validate_host_address
+from nmapreport.security_utils import safe_join, validate_notes_b64, validate_cpe_string, validate_ip_address, validate_host_address
 
 EVIL_XML = '''<?xml version="1.0"?>
 <nmaprun scanner="nmap" args="nmap -sV &lt;b&gt;" start="1" startstr="Mon" version="7.94" xmloutputversion="1.05">
@@ -32,9 +35,14 @@ def port(portid, cpes=(), protocol='tcp', name='svc'):
 	return '<port protocol="'+protocol+'" portid="'+portid+'"><state state="open" reason="syn-ack" reason_ttl="0"/>'+\
 	'<service name="'+name+'" product="p" version="1">'+''.join('<cpe>'+c+'</cpe>' for c in cpes)+'</service></port>'
 
-IPV4 = lambda a: '<address addr="'+a+'" addrtype="ipv4"/>'
-IPV6 = lambda a: '<address addr="'+a+'" addrtype="ipv6"/>'
-MAC = lambda a: '<address addr="'+a+'" addrtype="mac"/>'
+def IPV4(a):
+	return '<address addr="'+a+'" addrtype="ipv4"/>'
+
+def IPV6(a):
+	return '<address addr="'+a+'" addrtype="ipv6"/>'
+
+def MAC(a):
+	return '<address addr="'+a+'" addrtype="mac"/>'
 
 
 def b64notes(text):
@@ -86,38 +94,51 @@ class HelperTests(unittest.TestCase):
 		self.assertIsNone(host_address({'address': []}))
 
 
-@unittest.skipUnless(os.access('/opt/xml', os.W_OK) and os.access('/opt/notes', os.W_OK), 'needs writable /opt/xml and /opt/notes')
 class ScanDataTests(TestCase):
+	"""Each test class gets its own temporary XML and notes directories, so
+	the suite never touches a real /opt/xml or /opt/notes."""
 	scanfile = 'webmap-test.xml'
 	xml = EVIL_XML
 
 	def setUp(self):
-		self.created = []
+		cache.clear()
+		for d in (self.xmldir, self.notesdir):
+			for f in os.listdir(d):
+				os.remove(os.path.join(d, f))
 		self.write(self.scanfile, self.xml)
 		self.user = get_user_model().objects.create_user('tester', password='x-Test-Password-1')
 		self.client = Client()
 		self.client.force_login(self.user)
 		self.select(self.scanfile)
 
-	def tearDown(self):
-		for f in self.created:
-			if os.path.exists(f):
-				os.remove(f)
-		for f in glob.glob('/opt/notes/*'):
-			if f.endswith(('.label', '.notes', '.cve')) and os.path.getmtime(f) >= self.started:
-				os.remove(f)
-
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		import time
-		cls.started = time.time() - 1
+		cls.tmpdir = tempfile.mkdtemp(prefix='webmap-test-')
+		cls.xmldir = os.path.join(cls.tmpdir, 'xml')
+		cls.notesdir = os.path.join(cls.tmpdir, 'notes')
+		os.mkdir(cls.xmldir)
+		os.mkdir(cls.notesdir)
+		cls.dirpatches = [
+			mock.patch.object(scandata, 'XML_DIR', cls.xmldir),
+			mock.patch.object(scandata, 'NOTES_DIR', cls.notesdir),
+		]
+		for p in cls.dirpatches:
+			p.start()
+
+	@classmethod
+	def tearDownClass(cls):
+		for p in cls.dirpatches:
+			p.stop()
+		shutil.rmtree(cls.tmpdir, ignore_errors=True)
+		super().tearDownClass()
 
 	def write(self, name, content):
-		path = '/opt/xml/'+name
-		with open(path, 'w') as f:
+		with open(os.path.join(self.xmldir, name), 'w', encoding='utf-8') as f:
 			f.write(content)
-		self.created.append(path)
+
+	def notes_files(self):
+		return sorted(os.listdir(self.notesdir))
 
 	def select(self, name):
 		return self.client.post('/setscanfile/'+urllib.parse.quote(name))
@@ -235,14 +256,16 @@ class CPETests(ScanDataTests):
 				{'host': '10.0.0.9', 'port': '22', 'cpe': 'cpe:/a:openbsd:openssh:7.6'},
 				{'host': '10.0.0.2', 'port': '22', 'cpe': 'cpe:/a:x:y:../../../../api/last'},
 			]:
-				self.assertIn('error', self.client.post('/api/getcve/', data).json(), data)
+				resp = self.client.post('/api/getcve/', data)
+				self.assertEqual(resp.status_code, 400, data)
+				self.assertIn('error', resp.json(), data)
 		self.assertEqual(self.urls, [])
 
 	def test_malformed_cve_file_does_not_break_pages(self):
 		key = load_scan(self.scanfile).key
-		with open('/opt/notes/'+key+'_'+md5('10.0.0.2')+'.22.'+md5('x')+'.cve', 'w') as f:
+		with open(os.path.join(self.notesdir, key+'_'+md5('10.0.0.2')+'.22.'+md5('x')+'.cve'), 'w', encoding='utf-8') as f:
 			f.write('["a", "b"]')
-		with open('/opt/notes/'+key+'_'+md5('10.0.0.2')+'.80.cve', 'w') as f:
+		with open(os.path.join(self.notesdir, key+'_'+md5('10.0.0.2')+'.80.cve'), 'w', encoding='utf-8') as f:
 			f.write('{not json')
 		for url in ['/', '/10.0.0.2/', '/view/pdf/']:
 			self.get(url)
@@ -328,7 +351,7 @@ class PDFTests(ScanDataTests):
 		self.tmp = tempfile.mkdtemp()
 		self.log = os.path.join(self.tmp, 'log')
 		fake = os.path.join(self.tmp, 'wkhtmltopdf')
-		with open(fake, 'w') as f:
+		with open(fake, 'w', encoding='utf-8') as f:
 			f.write('#!/bin/sh\nprintf "%s\\n" "$@" > '+self.log+'.argv\ncat > '+self.log+'.stdin\nprintf "%%PDF-1.4 fake"\n')
 		os.chmod(fake, stat.S_IRWXU)
 		self.patch = mock.patch.object(api, 'WKHTMLTOPDF', fake)
@@ -344,7 +367,7 @@ class PDFTests(ScanDataTests):
 		self.assertEqual(resp['Content-Type'], 'application/pdf')
 		self.assertEqual(resp.content, b'%PDF-1.4 fake')
 
-		with open(self.log+'.argv') as f:
+		with open(self.log+'.argv', encoding='utf-8') as f:
 			argv = f.read().split('\n')
 		self.assertNotIn('--cookie', argv)
 		self.assertNotIn(self.client.session.session_key, argv)
@@ -352,7 +375,7 @@ class PDFTests(ScanDataTests):
 		self.assertEqual(argv[-3:-1], ['-', '-'])
 		self.assertFalse([a for a in argv if a.startswith('http')])
 
-		with open(self.log+'.stdin') as f:
+		with open(self.log+'.stdin', encoding='utf-8') as f:
 			html = f.read()
 		self.assertIn('Port Scan Report', html)
 		self.assertNotIn('<script', html)
@@ -368,3 +391,115 @@ class PDFTests(ScanDataTests):
 	def test_no_pdf_written_to_static(self):
 		self.client.post('/api/pdf/')
 		self.assertEqual(glob.glob(os.path.join(os.path.dirname(api.__file__), 'static', '*.pdf')), [])
+
+
+# v1.2 review
+class ContentSecurityPolicyTests(ScanDataTests):
+	def test_csp_header(self):
+		resp = self.client.get('/')
+		csp = resp['Content-Security-Policy']
+		self.assertIn("default-src 'none'", csp)
+		self.assertIn("script-src 'self'", csp)
+		self.assertNotIn('unsafe-inline', csp.split('script-src')[1].split(';')[0])
+		self.assertIn("frame-ancestors 'none'", csp)
+
+	def test_pages_have_no_inline_script(self):
+		for url in ['/', '/10.0.0.5/', '/service/http/', '/portid/80/']:
+			body = self.get(url)
+			# only non-executable JSON data blocks and external files
+			for tag in re.findall(r'<script\b[^>]*>', body):
+				self.assertTrue('src="/static/' in tag or 'type="application/json"' in tag, (url, tag))
+			self.assertNotRegex(body, r'<[^>]*\son[a-z]+=', url)
+			self.assertNotIn('javascript:', body, url)
+
+	def test_no_third_party_assets(self):
+		for url in ['/', '/login/']:
+			body = Client().get(url, follow=True).content.decode() if url == '/login/' else self.get(url)
+			self.assertNotRegex(body, r'<(link|script)[^>]+(href|src)="(https?:)?//', url)
+
+	def test_chart_data_is_json(self):
+		body = self.get('/')
+		data = json.loads(body.split('id="chartdata" type="application/json">')[1].split('</script>')[0])
+		self.assertEqual(data['ports'], [1, 0, 0])
+		self.assertEqual(data['servicelabels'], ['<img src=x onerror=alert(2)>'])
+		self.assertNotIn('<img src=x onerror=alert(2)>', body)
+
+
+class LoginThrottleTests(ScanDataTests):
+	def test_lockout_after_failures(self):
+		c = Client()
+		for _ in range(5):
+			self.assertEqual(c.post('/login/', {'username': 'tester', 'password': 'wrong'}).status_code, 200)
+		resp = c.post('/login/', {'username': 'tester', 'password': 'x-Test-Password-1'})
+		self.assertEqual(resp.status_code, 429)
+		self.assertIn('Too many failed logins', resp.content.decode())
+		self.assertNotIn('_auth_user_id', c.session)
+
+	def test_success_resets_counter(self):
+		c = Client()
+		for _ in range(4):
+			c.post('/login/', {'username': 'tester', 'password': 'wrong'})
+		self.assertEqual(c.post('/login/', {'username': 'tester', 'password': 'x-Test-Password-1'}).status_code, 302)
+		c.logout()
+		for _ in range(4):
+			c.post('/login/', {'username': 'tester', 'password': 'wrong'})
+		self.assertEqual(c.post('/login/', {'username': 'tester', 'password': 'x-Test-Password-1'}).status_code, 302)
+
+	def test_failures_are_logged(self):
+		with self.assertLogs('nmapreport.auth', 'WARNING') as logs:
+			Client().post('/login/', {'username': 'tester', 'password': 'wrong'})
+		self.assertIn("login failed user='tester'", logs.output[0])
+		self.assertNotIn('wrong', logs.output[0])
+
+
+class AnnotationScopeTests(ScanDataTests):
+	def test_annotations_only_for_hosts_in_scan(self):
+		other = md5('10.9.9.9')
+		for url, data in [
+			('/api/setlabel/host/Checked/'+other+'/', {}),
+			('/api/savenotes/', {'hashstr': other, 'notes': b64notes('x')}),
+		]:
+			resp = self.client.post(url, data)
+			self.assertEqual(resp.status_code, 400, url)
+		self.assertEqual(self.notes_files(), [])
+
+	def test_notes_roundtrip_utf8(self):
+		h = md5('10.0.0.5')
+		text = 'Zażółć gęślą jaźń <b>'
+		resp = self.client.post('/api/savenotes/', {'hashstr': h, 'notes': b64notes(text)})
+		self.assertEqual(resp.json(), {'ok': 'notes saved'})
+		self.assertIn('Zażółć gęślą jaźń &lt;b&gt;', self.get('/10.0.0.5/'))
+		self.assertEqual(self.client.post('/api/rmnotes/'+h+'/').status_code, 200)
+		self.assertEqual(self.client.post('/api/rmnotes/'+h+'/').status_code, 404)
+		self.assertEqual(self.notes_files(), [])
+
+	def test_errors_use_http_status(self):
+		self.assertEqual(self.client.post('/api/setlabel/host/Bogus/'+md5('10.0.0.5')+'/').status_code, 400)
+		self.assertEqual(self.client.get('/api/10.0.0.5/81/').status_code, 404)
+		self.select('unset')
+		self.assertEqual(self.client.post('/api/savenotes/', {'hashstr': md5('10.0.0.5'), 'notes': ''}).status_code, 400)
+
+
+class PathTests(unittest.TestCase):
+	def test_symlink_out_of_base_is_refused(self):
+		base = tempfile.mkdtemp()
+		outside = tempfile.mkdtemp()
+		try:
+			os.symlink(outside, os.path.join(base, 'link'))
+			with self.assertRaises(SuspiciousFileOperation):
+				safe_join(base, 'link', 'x.xml')
+			with self.assertRaises(SuspiciousFileOperation):
+				safe_join(base, '..', 'x.xml')
+			self.assertEqual(safe_join(base, 'a.xml'), os.path.join(os.path.realpath(base), 'a.xml'))
+		finally:
+			shutil.rmtree(base)
+			shutil.rmtree(outside)
+
+
+class ScanCacheTests(ScanDataTests):
+	def test_cache_is_bounded(self):
+		with mock.patch.object(scandata, 'CACHE_SIZE', 2):
+			for n in range(4):
+				self.write('webmap-cache-%d.xml' % n, nmaprun([]))
+				load_scan('webmap-cache-%d.xml' % n)
+			self.assertLessEqual(len(scandata._cache), 2)

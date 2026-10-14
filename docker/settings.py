@@ -1,15 +1,24 @@
 import os
 import secrets
 
+from django.utils.csp import CSP
+
+
+def env_bool(name, default=False):
+    return os.environ.get(name, str(default)).strip().lower() in ('true', '1', 'yes', 'on')
+
+
+def env_list(name, default=''):
+    return [v.strip() for v in os.environ.get(name, default).split(',') if v.strip()]
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
+# Every security-relevant setting comes from the environment; see .env.example
+# and docs/configuration.md for the full list.
 
-# SECURITY FIX: Use environment variable for SECRET_KEY
-# Generate a new key with: python -c "import secrets; print(secrets.token_urlsafe(50))"
+# Generate a key with: python3 -c "import secrets; print(secrets.token_urlsafe(50))"
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 if not SECRET_KEY:
     # For development only - generate random key
@@ -23,17 +32,18 @@ if not SECRET_KEY:
     SECRET_KEY = secrets.token_urlsafe(50)
 
 
-# SECURITY FIX: Make DEBUG configurable via environment variable
-# Set DEBUG=False for production
-DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
+# Never enable DEBUG on an instance anyone else can reach.
+DEBUG = env_bool('DEBUG')
 
-# SECURITY FIX: Restrict allowed hosts
-# Set ALLOWED_HOSTS environment variable in production
-# Default to localhost only for security
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1]').split(',')
+# Host names this instance answers to. Default: localhost only.
+ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1]')
 
-# SECURITY WARNING: This app is designed for localhost use only
-# DO NOT expose this application to the internet without proper security review
+# Origins allowed to send POST requests when WebMap is reached through a
+# TLS reverse proxy, e.g. "https://webmap.example.internal".
+CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')
+
+# WebMap is meant for localhost or a trusted internal network, never the
+# internet. The container itself speaks plain HTTP.
 
 # Authentication: the login user is created at container start from
 # WEBMAP_USER / WEBMAP_PASSWORD (manage.py webmap_user).
@@ -54,6 +64,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'django.middleware.csp.ContentSecurityPolicyMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -86,18 +97,19 @@ WSGI_APPLICATION = 'nmapdashboard.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/2.1/ref/settings/#databases
+# https://docs.djangoproject.com/en/stable/ref/settings/#databases
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': '/opt/nmapdashboard/db.sqlite3',
+        # Kept outside the code directory, which the app user cannot write.
+        'NAME': os.environ.get('WEBMAP_DB_PATH', '/opt/webmap-data/db.sqlite3'),
     }
 }
 
 
 # Password validation
-# https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators
+# https://docs.djangoproject.com/en/stable/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -116,7 +128,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # Internationalization
-# https://docs.djangoproject.com/en/2.1/topics/i18n/
+# https://docs.djangoproject.com/en/stable/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
 
@@ -131,18 +143,33 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/2.1/howto/static-files/
+# https://docs.djangoproject.com/en/stable/howto/static-files/
 
 STATIC_URL = '/static/'
 
 # Security Settings
 # https://docs.djangoproject.com/en/stable/topics/security/
 
-# Security headers
-# SECURE_BROWSER_XSS_FILTER removed in Django 4.0 - X-XSS-Protection header deprecated by browsers
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'same-origin'
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
+
+# Content Security Policy (Django's built-in middleware). Pages load scripts,
+# styles and fonts from this app only and carry no inline JavaScript.
+# 'unsafe-inline' for styles is needed for the style="" attributes in the
+# generated markup; it does not allow script execution.
+SECURE_CSP = {
+    'default-src': [CSP.NONE],
+    'script-src': [CSP.SELF],
+    'style-src': [CSP.SELF, CSP.UNSAFE_INLINE],
+    'img-src': [CSP.SELF, 'data:'],
+    'font-src': [CSP.SELF],
+    'connect-src': [CSP.SELF],
+    'form-action': [CSP.SELF],
+    'frame-ancestors': [CSP.NONE],
+    'base-uri': [CSP.SELF],
+}
 
 # Session security
 SESSION_COOKIE_HTTPONLY = True
@@ -154,18 +181,39 @@ SESSION_COOKIE_AGE = 3600  # 1 hour
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'Strict'
 
-# If using HTTPS (recommended for production):
-# SECURE_SSL_REDIRECT = True
-# SESSION_COOKIE_SECURE = True
-# CSRF_COOKIE_SECURE = True
-# SECURE_HSTS_SECONDS = 31536000
-# SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-# SECURE_HSTS_PRELOAD = True
+# HTTPS. The container has no TLS of its own; put a TLS reverse proxy in
+# front of it and set WEBMAP_HTTPS=true so cookies are only sent over HTTPS.
+# WEBMAP_TRUSTED_PROXY=true makes Django trust X-Forwarded-Proto from that
+# proxy: only set it if the proxy overwrites the header on every request.
+WEBMAP_HTTPS = env_bool('WEBMAP_HTTPS')
+SESSION_COOKIE_SECURE = WEBMAP_HTTPS
+CSRF_COOKIE_SECURE = WEBMAP_HTTPS
+if env_bool('WEBMAP_TRUSTED_PROXY'):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = env_bool('WEBMAP_SSL_REDIRECT')
+# HSTS is opt-in: once a browser has seen it, plain HTTP stops working for
+# that host name for the whole period.
+SECURE_HSTS_SECONDS = int(os.environ.get('WEBMAP_HSTS_SECONDS', '0'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('WEBMAP_HSTS_INCLUDE_SUBDOMAINS')
 
-# File upload limits
+# Request size limits
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
 
-# Content Security Policy: not enabled. The CSP_* settings that used to be
-# here had no effect (django-csp is not installed), and the views rely on
-# inline <script> blocks, so a useful policy needs a template refactor first.
+# Logging to stdout/stderr (docker logs). Failed and refused logins are
+# logged by nmapreport.auth, suspicious requests by django.security.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'plain': {'format': '%(asctime)s %(levelname)s %(name)s: %(message)s'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'plain'},
+    },
+    'root': {'handlers': ['console'], 'level': 'WARNING'},
+    'loggers': {
+        'nmapreport': {'level': os.environ.get('WEBMAP_LOG_LEVEL', 'INFO'), 'propagate': True},
+        'django.security': {'level': 'WARNING', 'propagate': True},
+    },
+}

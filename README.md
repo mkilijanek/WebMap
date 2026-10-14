@@ -184,7 +184,7 @@ Labels, notes and CVE results belong to one scan: they are keyed by the file nam
 - Search for CVE and Exploits based on CPE collected by Nmap
 
 ## XML Filenames
-When creating the PDF version of the Nmap XML Report, the XML filename is used as document title on the first page. 
+When creating the PDF version of the Nmap XML Report, the XML filename is used as document title on the first page.
 WebMap will replace some parts of the filename as following:
 
 - `_` will replaced by a space (` `)
@@ -194,8 +194,8 @@ Example: `ACME_Ltd..xml`<br>
 PDF title: `ACME Ltd.`
 
 ## CVE and Exploits
-thanks to the amazing API services by circl.lu, WebMap is able to looking for CVE and Exploits for each CPE collected by Nmap. 
-Not all CPE are checked over the circl.lu API, but only when a specific version is specified 
+thanks to the amazing API services by circl.lu, WebMap is able to looking for CVE and Exploits for each CPE collected by Nmap.
+Not all CPE are checked over the circl.lu API, but only when a specific version is specified
 (for example: `cpe:/a:microsoft:iis:7.5` and not `cpe:/o:microsoft:windows`).
 
 ## Third Parts
@@ -319,7 +319,7 @@ Current security status:
 - ✅ **6** automated security tools active
 
 ## Contributors
-This project is currently a beta, and I'm not super skilled on Django so, every type of contribution is appreciated. 
+This project is currently a beta, and I'm not super skilled on Django so, every type of contribution is appreciated.
 I'll mention all contributors in this section of the README file.
 
 ### Contributors List

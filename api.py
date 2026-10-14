@@ -1,9 +1,11 @@
 from django.http import HttpResponse
 from django.core.exceptions import SuspiciousFileOperation, ValidationError
 from django.views.decorators.csrf import csrf_protect
-from django.views.decorators.http import require_http_methods
-import json, os, requests, subprocess, shutil, threading, urllib.parse
-from .scan import ScanError, session_scan, find_host, unique_ports, md5, filter_cves, NOTES_DIR
+from django.views.decorators.csp import csp_override
+from django.views.decorators.http import require_GET, require_POST
+import functools, json, logging, os, requests, subprocess, shutil, threading, urllib.parse
+from . import scan as scandata
+from .scan import ScanError, session_scan, find_host, unique_ports, md5, filter_cves, host_keys
 from .pdf import render_report
 from .security_utils import (
     safe_join, validate_md5_hash,
@@ -12,164 +14,117 @@ from .security_utils import (
     validate_notes_b64
 )
 
+logger = logging.getLogger('nmapreport')
+
 WKHTMLTOPDF = os.environ.get('WKHTMLTOPDF_PATH') or shutil.which('wkhtmltopdf') or '/opt/wkhtmltox/bin/wkhtmltopdf'
 PDF_TIMEOUT = 60
+CVE_API = os.environ.get('WEBMAP_CVE_API', 'https://cve.circl.lu/api/cvefor/')
 
 # One wkhtmltopdf at a time; further requests get 429 instead of queueing up
 # on the server threads.
 _pdf_lock = threading.Lock()
 
-def scan_key(request):
-	# Annotation files are prefixed with the scan key (file name + content
-	# hash), so they belong to this exact scan and not to any later file
-	# saved under the same name.
+def jsonresponse(data, status=200):
+	return HttpResponse(json.dumps(data), content_type="application/json", status=status)
+
+def jsonerror(msg, status):
+	return jsonresponse({'error': msg}, status)
+
+def jsonapi(view):
+	"""Map the expected failures of an API view to JSON errors with a 4xx
+	status; anything else is logged and answered with a generic 500."""
+	@functools.wraps(view)
+	def wrapper(request, *args, **kwargs):
+		try:
+			return view(request, *args, **kwargs)
+		except ValidationError as e:
+			return jsonerror(' '.join(e.messages), 400)
+		except ScanError:
+			return jsonerror('scan file not readable', 400)
+		except SuspiciousFileOperation:
+			return jsonerror('invalid path', 400)
+		except Exception:
+			logger.exception('%s failed', view.__name__)
+			return jsonerror('operation failed', 500)
+	return wrapper
+
+def current_scan(request):
 	scan = session_scan(request)
 	if scan is None:
 		raise ValidationError('No scan file selected')
-	return scan.key
+	return scan
+
+def host_hash(scan, hashstr):
+	# Annotations can only be stored for hosts of the selected scan, so the
+	# API cannot be used to create an unbounded number of files.
+	hashstr = validate_md5_hash(hashstr)
+	if hashstr not in host_keys(scan):
+		raise ValidationError('Host not found in the selected scan')
+	return hashstr
+
+def annotation_path(scan, name):
+	return safe_join(scandata.NOTES_DIR, scan.key + '_' + name)
+
+def remove_file(path, okmsg):
+	try:
+		os.remove(path)
+	except FileNotFoundError:
+		return jsonerror('file not found', 404)
+	return jsonresponse({'ok': okmsg})
+
+def write_file(path, content):
+	# Write to a temporary file and rename it into place, so a reader never
+	# sees a half-written annotation.
+	tmp = path + '.tmp'
+	with open(tmp, 'w', encoding='utf-8') as f:
+		f.write(content)
+	os.replace(tmp, path)
 
 @csrf_protect
-@require_http_methods(['POST'])
+@require_POST
+@jsonapi
 def rmNotes(request, hashstr):
-	try:
-		# Validate inputs
-		scankey = scan_key(request)
-		hashstr = validate_md5_hash(hashstr)
-
-		# Safe file path construction
-		notes_dir = NOTES_DIR
-		filename = f'{scankey}_{hashstr}.notes'
-		filepath = safe_join(notes_dir, filename)
-
-		# Check file exists before removing
-		if os.path.exists(filepath):
-			os.remove(filepath)
-			res = {'ok': 'notes removed'}
-		else:
-			res = {'error': 'file not found'}
-
-	except ValidationError as e:
-		res = {'error': ' '.join(e.messages)}
-	except ScanError:
-		res = {'error': 'scan file not readable'}
-	except SuspiciousFileOperation:
-		res = {'error': 'invalid path'}
-	except Exception as e:
-		res = {'error': 'operation failed'}
-
-	return HttpResponse(json.dumps(res), content_type="application/json")
+	scan = current_scan(request)
+	hashstr = host_hash(scan, hashstr)
+	return remove_file(annotation_path(scan, hashstr + '.notes'), 'notes removed')
 
 @csrf_protect
-@require_http_methods(['POST'])
+@require_POST
+@jsonapi
 def saveNotes(request):
-	try:
-		# Validate inputs
-		scankey = scan_key(request)
-		hashstr = validate_md5_hash(request.POST.get('hashstr', ''))
-
-		# Validate notes content (max 10KB)
-		notes_content = validate_notes_b64(request.POST.get('notes', ''))
-
-		# Safe file path construction
-		notes_dir = NOTES_DIR
-		filename = f'{scankey}_{hashstr}.notes'
-		filepath = safe_join(notes_dir, filename)
-
-		# Write notes securely
-		with open(filepath, 'w', encoding='utf-8') as f:
-			f.write(notes_content)
-
-		res = {'ok': 'notes saved'}
-
-	except ValidationError as e:
-		res = {'error': ' '.join(e.messages)}
-	except ScanError:
-		res = {'error': 'scan file not readable'}
-	except SuspiciousFileOperation:
-		res = {'error': 'invalid path'}
-	except Exception as e:
-		res = {'error': 'operation failed'}
-
-	return HttpResponse(json.dumps(res), content_type="application/json")
+	scan = current_scan(request)
+	hashstr = host_hash(scan, request.POST.get('hashstr', ''))
+	# urlencoded base64 of UTF-8 text, max 10 KB
+	notes = validate_notes_b64(request.POST.get('notes', ''))
+	write_file(annotation_path(scan, hashstr + '.notes'), notes)
+	return jsonresponse({'ok': 'notes saved'})
 
 @csrf_protect
-@require_http_methods(['POST'])
+@require_POST
+@jsonapi
 def rmlabel(request, objtype, hashstr):
-	try:
-		# Validate inputs
-		objtype = validate_object_type(objtype)
-		scankey = scan_key(request)
-		hashstr = validate_md5_hash(hashstr)
-
-		# Safe file path construction
-		notes_dir = NOTES_DIR
-		filename = f'{scankey}_{hashstr}.{objtype}.label'
-		filepath = safe_join(notes_dir, filename)
-
-		# Check file exists before removing
-		if os.path.exists(filepath):
-			os.remove(filepath)
-			res = {'ok': 'label removed'}
-		else:
-			res = {'error': 'file not found'}
-
-	except ValidationError as e:
-		res = {'error': ' '.join(e.messages)}
-	except ScanError:
-		res = {'error': 'scan file not readable'}
-	except SuspiciousFileOperation:
-		res = {'error': 'invalid path'}
-	except Exception as e:
-		res = {'error': 'operation failed'}
-
-	return HttpResponse(json.dumps(res), content_type="application/json")
+	objtype = validate_object_type(objtype)
+	scan = current_scan(request)
+	hashstr = host_hash(scan, hashstr)
+	return remove_file(annotation_path(scan, hashstr + '.' + objtype + '.label'), 'label removed')
 
 @csrf_protect
-@require_http_methods(['POST'])
+@require_POST
+@jsonapi
 def label(request, objtype, label, hashstr):
-	try:
-		# Validate inputs
-		label = validate_label(label)
-		objtype = validate_object_type(objtype)
-		scankey = scan_key(request)
-		hashstr = validate_md5_hash(hashstr)
+	label = validate_label(label)
+	objtype = validate_object_type(objtype)
+	scan = current_scan(request)
+	hashstr = host_hash(scan, hashstr)
+	write_file(annotation_path(scan, hashstr + '.' + objtype + '.label'), label)
+	return jsonresponse({'ok': 'label set', 'label': label})
 
-		# Safe file path construction
-		notes_dir = NOTES_DIR
-		filename = f'{scankey}_{hashstr}.{objtype}.label'
-		filepath = safe_join(notes_dir, filename)
-
-		# Write label securely
-		with open(filepath, 'w', encoding='utf-8') as f:
-			f.write(label)
-
-		res = {'ok': 'label set', 'label': label}
-
-	except ValidationError as e:
-		res = {'error': ' '.join(e.messages)}
-	except ScanError:
-		res = {'error': 'scan file not readable'}
-	except SuspiciousFileOperation:
-		res = {'error': 'invalid path'}
-	except Exception as e:
-		res = {'error': 'operation failed'}
-
-	return HttpResponse(json.dumps(res), content_type="application/json")
-
+@require_GET
+@jsonapi
 def port_details(request, address, portid):
-	try:
-		# Validate inputs
-		address = validate_host_address(address)
-		portid = str(validate_port_number(portid))
-		scan = session_scan(request)
-		if scan is None:
-			raise ValidationError('No scan file selected')
-	except ValidationError as e:
-		return HttpResponse(json.dumps({'error': ' '.join(e.messages)}), content_type="application/json", status=400)
-	except ScanError:
-		return HttpResponse(json.dumps({'error': 'scan file not readable'}), content_type="application/json", status=400)
-	except SuspiciousFileOperation:
-		return HttpResponse(json.dumps({'error': 'invalid path'}), content_type="application/json", status=400)
+	address = validate_host_address(address)
+	portid = str(validate_port_number(portid))
+	scan = current_scan(request)
 
 	host = find_host(scan, address)
 	if host is not None:
@@ -177,18 +132,16 @@ def port_details(request, address, portid):
 			if p['@portid'] == portid:
 				return HttpResponse(json.dumps(p, indent=4), content_type="application/json")
 
-	return HttpResponse(json.dumps({'error': 'not found'}), content_type="application/json", status=404)
+	return jsonerror('not found', 404)
 
-def jsonerror(msg, status):
-	return HttpResponse(json.dumps({'error': msg}), content_type="application/json", status=status)
-
+# The browser shows the PDF inline; a page CSP (object-src 'none') can stop
+# its built-in viewer, and a PDF response has no HTML to protect.
+@csp_override({})
 @csrf_protect
-@require_http_methods(['POST'])
+@require_POST
 def genPDF(request):
 	try:
-		scan = session_scan(request)
-		if scan is None:
-			raise ValidationError('No scan file selected')
+		scan = current_scan(request)
 		report = render_report(scan)
 	except ValidationError as e:
 		return jsonerror(' '.join(e.messages), 400)
@@ -219,14 +172,17 @@ def genPDF(request):
 			capture_output=True
 		)
 	except subprocess.TimeoutExpired:
+		logger.warning('wkhtmltopdf timed out after %ss', PDF_TIMEOUT)
 		return jsonerror('PDF generation timeout', 504)
 	except OSError:
+		logger.exception('wkhtmltopdf could not be started')
 		return jsonerror('PDF generation failed', 500)
 	finally:
 		_pdf_lock.release()
 
 	# wkhtmltopdf can exit non-zero on warnings while still producing a PDF
 	if not result.stdout.startswith(b'%PDF'):
+		logger.error('wkhtmltopdf exited %s without a PDF: %s', result.returncode, result.stderr[-2000:].decode('utf-8', 'replace'))
 		return jsonerror('PDF generation failed', 500)
 
 	response = HttpResponse(result.stdout, content_type='application/pdf')
@@ -235,64 +191,44 @@ def genPDF(request):
 	return response
 
 @csrf_protect
-@require_http_methods(['POST'])
+@require_POST
+@jsonapi
 def getCVE(request):
+	scan = current_scan(request)
+
+	host = validate_host_address(request.POST.get('host', ''))
+	port = str(validate_port_number(request.POST.get('port', '')))
+	cpe = validate_cpe_string(request.POST.get('cpe', ''))
+
+	# Only look up CPEs that the selected scan reports for this host/port
+	hostobj = find_host(scan, host)
+	if hostobj is None or not any(p['@portid'] == port and cpe in p['service']['cpe'] for p in unique_ports(hostobj)):
+		raise ValidationError('CPE not found for this host and port in the selected scan')
+
 	try:
-		# Validate inputs
-		scan = session_scan(request)
-		if scan is None:
-			raise ValidationError('No scan file selected')
+		r = requests.get(
+			CVE_API + urllib.parse.quote(cpe, safe=':/'),
+			timeout=10,
+			headers={'User-Agent': 'WebMap/1.0'},
+			allow_redirects=False
+		)
+		r.raise_for_status()
+		cvejson = r.json()
+	except (requests.RequestException, ValueError) as e:
+		logger.warning('CVE lookup for %s failed: %s', cpe, e)
+		return jsonerror('Failed to fetch CVE data from external API', 502)
 
-		host = validate_host_address(request.POST.get('host', ''))
-		hostmd5 = md5(host)
+	if not isinstance(cvejson, list):
+		logger.warning('CVE lookup for %s: unexpected response type %s', cpe, type(cvejson).__name__)
+		return jsonerror('Unexpected CVE API response', 502)
 
-		port = str(validate_port_number(request.POST.get('port', '')))
-		cpe = validate_cpe_string(request.POST.get('cpe', ''))
+	# Keep only well-formed entries (dicts with a string id)
+	cves = filter_cves(cvejson)
 
-		# Only look up CPEs that the selected scan reports for this host/port
-		hostobj = find_host(scan, host)
-		if hostobj is None or not any(p['@portid'] == port and cpe in p['service']['cpe'] for p in unique_ports(hostobj)):
-			raise ValidationError('CPE not found for this host and port in the selected scan')
+	# One file per CPE, so several CPEs on one port do not overwrite
+	# each other's results.
+	write_file(annotation_path(scan, md5(host) + '.' + port + '.' + md5(cpe) + '.cve'), json.dumps(cves))
 
-		# Make external API call with timeout and error handling
-		try:
-			r = requests.get(
-				'https://cve.circl.lu/api/cvefor/' + urllib.parse.quote(cpe, safe=':/'),
-				timeout=10,  # 10 second timeout
-				headers={'User-Agent': 'WebMap/1.0'},
-				allow_redirects=False
-			)
-			r.raise_for_status()
-			cvejson = r.json()
-		except (requests.RequestException, ValueError) as e:
-			raise ValidationError('Failed to fetch CVE data from external API')
-
-		if not isinstance(cvejson, list):
-			raise ValidationError('Unexpected CVE API response')
-
-		# Keep only well-formed entries (dicts with a string id)
-		cves = filter_cves(cvejson)
-
-		# One file per CPE, so several CPEs on one port do not overwrite
-		# each other's results.
-		filename = f'{scan.key}_{hostmd5}.{port}.{md5(cpe)}.cve'
-		filepath = safe_join(NOTES_DIR, filename)
-
-		with open(filepath, 'w', encoding='utf-8') as f:
-			f.write(json.dumps(cves))
-
-		if len(cves) > 0:
-			res = {host: {port: {'id': cves[0]['id']}}}
-		else:
-			res = {'info': 'No CVE data found'}
-
-	except ValidationError as e:
-		res = {'error': ' '.join(e.messages)}
-	except ScanError:
-		res = {'error': 'scan file not readable'}
-	except SuspiciousFileOperation:
-		res = {'error': 'invalid path'}
-	except Exception as e:
-		res = {'error': 'operation failed'}
-
-	return HttpResponse(json.dumps(res), content_type="application/json")
+	if len(cves) > 0:
+		return jsonresponse({host: {port: {'id': cves[0]['id']}}})
+	return jsonresponse({'info': 'No CVE data found'})

@@ -2,19 +2,25 @@ name: SBOM Generation
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [v2/master]
     tags:
       - 'v*'
   release:
-    types: [ published ]
-  workflow_dispatch:  # Allow manual trigger
+    types: [published]
+  workflow_dispatch:
   schedule:
-    # Regenerate SBOM monthly on the 1st at 4:00 AM UTC
+    # Monthly on the 1st at 4:00 AM UTC
     - cron: '0 4 1 * *'
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.12'
+  CYCLONEDX_CLI_VERSION: 'v0.33.1'
+  CYCLONEDX_CLI_SHA256: 'bfc8b2538da86fe239bc53658bbb63c1c8c510a293c1e6891aa5bea5d3c58746'
+  OSV_SCANNER_VERSION: 'v2.7.0'
+  OSV_SCANNER_SHA256: '160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b'
 
 jobs:
   generate-sbom:
@@ -23,67 +29,58 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install SBOM generation tools
+      # The SBOM describes what the container installs: requirements.txt,
+      # gunicorn and every transitive dependency, resolved in a clean venv.
+      - name: Generate CycloneDX SBOM
         run: |
-          python -m pip install --upgrade pip
-          pip install cyclonedx-bom spdx-tools
-
-      - name: Create SBOM directory
-        run: mkdir -p .sbom
-
-      - name: Generate CycloneDX SBOM (JSON)
-        run: |
-          cyclonedx-py requirements requirements.txt \
-            --of JSON \
-            --sv 1.6 \
-            --mc-type application \
-            -o .sbom/sbom.cyclonedx.json
-
-      - name: Generate CycloneDX SBOM (XML)
-        run: |
-          cyclonedx-py requirements requirements.txt \
-            --of XML \
-            --sv 1.6 \
-            --mc-type application \
-            -o .sbom/sbom.cyclonedx.xml
+          python -m venv /tmp/webmap-env
+          /tmp/webmap-env/bin/pip install -r requirements.txt gunicorn==23.0.0
+          python -m pip install cyclonedx-bom==7.5.0
+          mkdir -p .sbom
+          for fmt in JSON XML; do
+            ext=$(echo "$fmt" | tr 'A-Z' 'a-z')
+            cyclonedx-py environment /tmp/webmap-env --pyproject /dev/null \
+              --of "$fmt" --sv 1.6 --mc-type application \
+              -o ".sbom/sbom.cyclonedx.$ext"
+          done
 
       - name: Validate CycloneDX SBOM
         run: |
-          # Install cyclonedx-cli for validation
-          wget -q https://github.com/CycloneDX/cyclonedx-cli/releases/latest/download/cyclonedx-linux-x64 -O cyclonedx
+          curl -sSfL -o cyclonedx \
+            "https://github.com/CycloneDX/cyclonedx-cli/releases/download/${CYCLONEDX_CLI_VERSION}/cyclonedx-linux-x64"
+          echo "${CYCLONEDX_CLI_SHA256}  cyclonedx" | sha256sum -c -
           chmod +x cyclonedx
-          ./cyclonedx validate --input-file .sbom/sbom.cyclonedx.json --fail-on-errors || true
+          ./cyclonedx validate --input-file .sbom/sbom.cyclonedx.json --fail-on-errors
+
+      - name: Generate SPDX SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: 'sbom'
+          scan-ref: '.sbom/sbom.cyclonedx.json'
+          format: 'spdx-json'
+          output: '.sbom/sbom.spdx.json'
 
       - name: Generate SBOM summary
         run: |
-          echo "# SBOM Generation Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Files Generated" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- \`.sbom/sbom.cyclonedx.json\` - CycloneDX JSON format" >> $GITHUB_STEP_SUMMARY
-          echo "- \`.sbom/sbom.cyclonedx.xml\` - CycloneDX XML format" >> $GITHUB_STEP_SUMMARY
-          echo "- \`.sbom/sbom.spdx.json\` - SPDX JSON format (committed)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Component Count" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          COMPONENT_COUNT=$(jq '.components | length' .sbom/sbom.cyclonedx.json)
-          echo "Total Components: **$COMPONENT_COUNT**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Components" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Name | Version | Type |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|---------|------|" >> $GITHUB_STEP_SUMMARY
-          jq -r '.components[] | "| \(.name) | \(.version) | \(.type) |"' .sbom/sbom.cyclonedx.json >> $GITHUB_STEP_SUMMARY
+          {
+            echo "# SBOM Generation Summary"
+            echo
+            echo "| Name | Version | Licence |"
+            echo "|------|---------|---------|"
+            jq -r '.components[] | "| \(.name) | \(.version) | \([.licenses[]?.license | .id // .name] | join(", ")) |"' .sbom/sbom.cyclonedx.json
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: sbom-files
           path: |
@@ -92,17 +89,24 @@ jobs:
             .sbom/sbom.spdx.json
           retention-days: 90
 
-      - name: Commit SBOM to repository
-        if: github.event_name == 'push' || github.event_name == 'release'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .sbom/
-          git diff --quiet && git diff --staged --quiet || \
-            (git commit -m "📦 Update SBOM (automated)" && git push) || true
+  # Committed SBOM files are refreshed by a pull request (the default branch
+  # can be protected), not by a direct push from the workflow.
+  # The SBOM is attached to published releases.
+  attach-to-release:
+    name: Attach SBOM to release
+    needs: generate-sbom
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download SBOM artifacts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: sbom-files
+          path: .sbom
 
       - name: Attach SBOM to release
-        if: github.event_name == 'release'
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
           files: |
@@ -114,13 +118,18 @@ jobs:
     name: Scan SBOM for Vulnerabilities
     needs: generate-sbom
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Download SBOM artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: sbom-files
           path: .sbom
@@ -135,37 +144,28 @@ jobs:
           severity: 'CRITICAL,HIGH,MEDIUM'
 
       - name: Upload Trivy SBOM scan results
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         if: always()
         with:
           sarif_file: 'trivy-sbom-results.sarif'
           category: 'sbom-scan'
 
-      - name: Scan with OSV Scanner
-        continue-on-error: true
+      - name: Scan with OSV-Scanner
         run: |
-          # Install OSV Scanner
-          curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o osv-scanner
+          curl -sSfL -o osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
+          echo "${OSV_SCANNER_SHA256}  osv-scanner" | sha256sum -c -
           chmod +x osv-scanner
-
-          # Scan SBOM
-          ./osv-scanner --sbom=.sbom/sbom.cyclonedx.json --format=sarif --output=osv-sbom-results.sarif || true
+          # OSV-Scanner picks the SBOM parser by file name (*.cdx.json)
+          cp .sbom/sbom.cyclonedx.json sbom.cdx.json
+          ./osv-scanner scan source -L sbom.cdx.json --format=sarif --output=osv-sbom-results.sarif || status=$?
+          # 1 = vulnerabilities found (reported, not fatal here); >1 = scanner error
+          if [ "${status:-0}" -gt 1 ]; then exit "$status"; fi
 
       - name: Upload OSV scan results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: osv-sbom-scan
           path: osv-sbom-results.sarif
           retention-days: 30
-
-      - name: SBOM Vulnerability Summary
-        if: always()
-        run: |
-          echo "# SBOM Vulnerability Scan" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ SBOM scanned with:" >> $GITHUB_STEP_SUMMARY
-          echo "- Trivy (comprehensive vulnerability scanner)" >> $GITHUB_STEP_SUMMARY
-          echo "- OSV Scanner (Google Open Source Vulnerabilities)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Results uploaded to GitHub Security tab." >> $GITHUB_STEP_SUMMARY

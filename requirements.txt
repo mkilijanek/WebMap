@@ -1,21 +1,16 @@
-# WebMap Dependencies
-# Updated: 2025-12-20
-# Security: All versions pinned for security and reproducibility
+# WebMap runtime dependencies (direct only, pinned).
+# Transitive dependencies are listed in .sbom/; the container adds
+# gunicorn (docker/Dockerfile) and Debian's wkhtmltopdf.
+# Django 6.x needs Python >= 3.12.
 
-# Django web framework
-Django==6.1.2  # Feature release (not LTS); fixes CVE-2026-15830 (GHSA-q238-5cxm-5c9h), CVE-2025-64459, CVE-2024-53908, CVE-2025-57833, CVE-2025-59681
+# Web framework. 6.1 is a feature release, not LTS: plan the move to the
+# next LTS (6.2) when it is out.
+Django==6.1.2
 
-# HTTP library for CVE API calls
-requests==2.34.2  # Latest stable, no known vulnerabilities
+# HTTPS client for the CVE lookup (cve.circl.lu)
+requests==2.34.2
 
-# XML parsing library
-xmltodict==1.0.4  # Updated from 0.13.0, includes security fixes
-
-# Secure XML parsing (XXE protection)
-defusedxml==0.7.1  # Protection against XML attacks
-
-# Optional: Security scanning tools (development only)
-# Uncomment for security testing:
-# bandit==1.7.8  # Security linter
-# safety==3.2.0  # Dependency vulnerability scanner
-# pip-audit==2.7.3  # Audit pip packages for known vulnerabilities
+# Nmap XML -> dict. Parsed with entity expansion disabled
+# (xmltodict.parse(..., disable_entities=True)) on top of expat's own
+# entity-amplification limits.
+xmltodict==1.0.4
