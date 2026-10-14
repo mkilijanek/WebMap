@@ -68,7 +68,12 @@ jobs:
           # requirements.txt plus the server the container installs
           { cat requirements.txt; echo 'gunicorn==23.0.0'; } > audit-requirements.txt
           pip-audit -r audit-requirements.txt --format markdown --output pip-audit-report.md || status=$?
-          cat pip-audit-report.md >> "$GITHUB_STEP_SUMMARY"
+          # pip-audit writes no report file when nothing is found
+          if [ -s pip-audit-report.md ]; then
+            cat pip-audit-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'pip-audit: no known vulnerabilities found' | tee pip-audit-report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
           exit "${status:-0}"
 
       - name: Upload pip-audit report
