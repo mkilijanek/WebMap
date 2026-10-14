@@ -26,7 +26,7 @@ class Command(BaseCommand):
 				self.stderr.write('%s: skipped (%s)' % (name, e))
 				continue
 
-			oldkey = hashlib.md5(name.encode('utf-8')).hexdigest()
+			oldkey = hashlib.md5(name.encode('utf-8'), usedforsecurity=False).hexdigest()
 			for fn in files:
 				if not fn.startswith(oldkey + '_'):
 					continue

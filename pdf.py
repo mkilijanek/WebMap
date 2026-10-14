@@ -221,7 +221,7 @@ def render_report(scan):
 	'	</div>'+\
 	'</div>'
 
-	r['css'] = mark_safe(_asset('vendor/materialize-1.0.0.min.css') + '\n' + _asset('report.css'))
+	r['css'] = mark_safe(_asset('vendor/materialize-1.0.0.min.css') + '\n' + _asset('report.css'))  # nosec B308 B703 - our own static CSS, no user input
 
 	return render_to_string('nmapreport/report.html', r)
 

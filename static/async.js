@@ -102,9 +102,9 @@ function removeNotes(hashstr, i) {
 }
 
 function saveNotes() {
-	nb64 = encodeURIComponent(btoa($('#notes').val()));
-	csrftoken = $('input[name="csrfmiddlewaretoken"]').val();
-	hashstr = $('#hashstr').val();
+	var nb64 = encodeURIComponent(btoa($('#notes').val()));
+	var csrftoken = $('input[name="csrfmiddlewaretoken"]').val();
+	var hashstr = $('#hashstr').val();
 	console.log(hashstr);
 	$.post('/report/api/savenotes/', {
 		'notes': nb64,
@@ -121,10 +121,9 @@ function saveNotes() {
 
 function openNotes(hashstr, notesb64) {
 	if(/^[a-f0-9]{32,32}$/.test(hashstr)) {
+		var savednotes = '';
 		if(notesb64 != '') {
 			savednotes = atob(decodeURIComponent(notesb64));
-		} else {
-			savednotes = ''
 		}
 		$('#modal1').css('background-color','#3e3e3e');
 		$('#modaltitle').html('Save Notes');
@@ -145,15 +144,15 @@ function apiPortDetails(address, portid) {
 
 		$('#modaltitle').html('Port Details: <span class="blue-text">'+$('<span/>').text(data['@portid']).html()+' / '+$('<span/>').text(data['@protocol']).html()+'</span>');
 
-		tbody = ''
-		ingorescriptid = {
+		var tbody = '';
+		var ingorescriptid = {
 			'fingerprint-strings':true
 		}
 
 		console.log(typeof(data['script']));
 		if(typeof(data['script']) !== 'undefined') {
 			if(typeof(data['script']) === 'object' && typeof(data['script']['@id']) === 'undefined') {
-				for(sid in data['script']) {
+				for(var sid in data['script']) {
 					if(typeof(ingorescriptid[data['script'][sid]['@id']]) !== 'undefined') { continue; }
 					tbody += '<tr><td class="orange-text">'+$('<span/>').text(data['script'][sid]['@id']).html()+'</td><td style="font-family:monospace;font-size:12px;">'+$('<span/>').text(data['script'][sid]['@output']).html()+'</td></tr>'
 				}
@@ -177,8 +176,8 @@ function apiPortDetails(address, portid) {
 function removeLabel(type, hashstr, i) {
 	$.post('/report/api/rmlabel/'+type+'/'+hashstr+'/', {'csrfmiddlewaretoken': getCSRFToken()}).done(function(data) {
 		if(data['ok'] == 'label removed') {
-			$('#hostlabel'+i).attr("class","")
-			$('#hostlabel'+i).html("");
+			$('#hostlabel'+i).attr("class","");
+			$('#hostlabel'+i).text("");
 		}
 	});
 }
@@ -195,11 +194,11 @@ function setLabel(type, label, hashstr, i) {
 				case 'Warning': color = 'orange'; margin = '28px'; break;
 				case 'Checked': color = 'blue'; margin = '28px'; break;
 			}
-			$('#hostlabel'+i).css("margin-left", margin)
-			$('#hostlabel'+i).attr("class","")
+			$('#hostlabel'+i).css("margin-left", margin);
+			$('#hostlabel'+i).attr("class","");
 			$('#hostlabel'+i).addClass('rightlabel');
 			$('#hostlabel'+i).addClass(color);
-			$('#hostlabel'+i).html(res['label']);
+			$('#hostlabel'+i).text(res['label']);
 		}
 	});
 }
