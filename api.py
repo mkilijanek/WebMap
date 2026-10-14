@@ -50,8 +50,8 @@ def rmNotes(request, hashstr):
 
 	except ValidationError as e:
 		res = {'error': ' '.join(e.messages)}
-	except ScanError as e:
-		res = {'error': str(e)}
+	except ScanError:
+		res = {'error': 'scan file not readable'}
 	except SuspiciousFileOperation:
 		res = {'error': 'invalid path'}
 	except Exception as e:
@@ -83,8 +83,8 @@ def saveNotes(request):
 
 	except ValidationError as e:
 		res = {'error': ' '.join(e.messages)}
-	except ScanError as e:
-		res = {'error': str(e)}
+	except ScanError:
+		res = {'error': 'scan file not readable'}
 	except SuspiciousFileOperation:
 		res = {'error': 'invalid path'}
 	except Exception as e:
@@ -115,8 +115,8 @@ def rmlabel(request, objtype, hashstr):
 
 	except ValidationError as e:
 		res = {'error': ' '.join(e.messages)}
-	except ScanError as e:
-		res = {'error': str(e)}
+	except ScanError:
+		res = {'error': 'scan file not readable'}
 	except SuspiciousFileOperation:
 		res = {'error': 'invalid path'}
 	except Exception as e:
@@ -147,8 +147,8 @@ def label(request, objtype, label, hashstr):
 
 	except ValidationError as e:
 		res = {'error': ' '.join(e.messages)}
-	except ScanError as e:
-		res = {'error': str(e)}
+	except ScanError:
+		res = {'error': 'scan file not readable'}
 	except SuspiciousFileOperation:
 		res = {'error': 'invalid path'}
 	except Exception as e:
@@ -166,8 +166,8 @@ def port_details(request, address, portid):
 			raise ValidationError('No scan file selected')
 	except ValidationError as e:
 		return HttpResponse(json.dumps({'error': ' '.join(e.messages)}), content_type="application/json", status=400)
-	except ScanError as e:
-		return HttpResponse(json.dumps({'error': str(e)}), content_type="application/json", status=400)
+	except ScanError:
+		return HttpResponse(json.dumps({'error': 'scan file not readable'}), content_type="application/json", status=400)
 	except SuspiciousFileOperation:
 		return HttpResponse(json.dumps({'error': 'invalid path'}), content_type="application/json", status=400)
 
@@ -288,8 +288,8 @@ def getCVE(request):
 
 	except ValidationError as e:
 		res = {'error': ' '.join(e.messages)}
-	except ScanError as e:
-		res = {'error': str(e)}
+	except ScanError:
+		res = {'error': 'scan file not readable'}
 	except SuspiciousFileOperation:
 		res = {'error': 'invalid path'}
 	except Exception as e:

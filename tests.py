@@ -1,5 +1,5 @@
 import base64, glob, json, os, stat, tempfile, urllib.parse, unittest
-from unittest import mock
+import unittest.mock as mock
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase, Client
@@ -344,14 +344,16 @@ class PDFTests(ScanDataTests):
 		self.assertEqual(resp['Content-Type'], 'application/pdf')
 		self.assertEqual(resp.content, b'%PDF-1.4 fake')
 
-		argv = open(self.log+'.argv').read().split('\n')
+		with open(self.log+'.argv') as f:
+			argv = f.read().split('\n')
 		self.assertNotIn('--cookie', argv)
 		self.assertNotIn(self.client.session.session_key, argv)
 		self.assertIn('--disable-javascript', argv)
 		self.assertEqual(argv[-3:-1], ['-', '-'])
 		self.assertFalse([a for a in argv if a.startswith('http')])
 
-		html = open(self.log+'.stdin').read()
+		with open(self.log+'.stdin') as f:
+			html = f.read()
 		self.assertIn('Port Scan Report', html)
 		self.assertNotIn('<script', html)
 		self.assertNotRegex(html, r'(src|href)="(https?:)?//[^"]*\.(js|css)')
