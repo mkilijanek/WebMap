@@ -1,94 +1,61 @@
-from django.shortcuts import render
 from django.http import HttpResponse
-import xmltodict, json, html, os, hashlib, re, urllib.parse, base64
-from collections import OrderedDict
+from django.template.loader import render_to_string
+from django.utils.safestring import mark_safe
+import base64, html, os
 from nmapreport.functions import *
-#from view import labelToColor
+from nmapreport.scan import session_scan, read_annotations, host_address, scaninfo_field, unique_ports, md5
 
-def reportPDFView(request):
+STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+
+_assets = {}
+
+def _asset(name, binary=False):
+	# The report is rendered from a string (stdin of wkhtmltopdf), so CSS and
+	# images are inlined instead of being fetched from this server or a CDN.
+	if name not in _assets:
+		with open(os.path.join(STATIC_DIR, name), 'rb') as f:
+			data = f.read()
+		_assets[name] = base64.b64encode(data).decode() if binary else data.decode('utf-8')
+	return _assets[name]
+
+def bars(title, items):
+	# Server-side replacement for the Google Charts pies; no JavaScript needed.
+	total = sum(c for _, c in items) or 1
+	out = '<div class="chart"><b>'+esc(title)+'</b><table class="bars">'
+	for label, count in items:
+		out += '<tr><td class="barlabel">'+esc(label)+'</td>'+\
+		'<td class="barcell"><div class="bar" style="width:'+str(round(count * 100 / total, 1))+'%;"></div></td>'+\
+		'<td class="barcount">'+str(count)+'</td></tr>'
+	return out + '</table></div>'
+
+def render_report(scan):
 	r = { 'out':'' }
 	filterscriptid = {
 	}
-
-	if 'scanfile' in request.session:
-		oo = xmltodict.parse(open('/opt/xml/'+request.session['scanfile'], 'r').read())
-		r['out2'] = json.dumps(oo['nmaprun'], indent=4)
-		o = json.loads(r['out2'])
-	else:
-		return HttpResponse('error: scan file not loaded', content_type="text/html")	
+	o = scan.data
 
 	r['html'] = ''
 	hostdetails = ''
 	counters = {'po':0,'pc':0,'pf':0,'hostsup':0,'ostype':{},'pi':{},'ss':{}}
 
-	scanmd5 = hashlib.md5(str(request.session['scanfile']).encode('utf-8')).hexdigest()
+	labelhost, noteshost, cvehost = read_annotations(scan.key)
 
-	# collect all cve in cvehost dict
-	cvehost = {}
-	cvefiles = os.listdir('/opt/notes')
-	for cf in cvefiles:
-		m = re.match('^('+scanmd5+')_([a-z0-9]{32,32})\.([0-9]+)\.cve$', cf)
-		if m is not None:
-			if m.group(1) not in cvehost:
-				cvehost[m.group(1)] = {}
-
-			if m.group(2) not in cvehost[m.group(1)]:
-				cvehost[m.group(1)][m.group(2)] = {}
-
-			cvehost[m.group(1)][m.group(2)][m.group(3)] = open('/opt/notes/'+cf, 'r').read()
-
-	for ik in o['host']:
-
-		# this fix single host report
-		if type(ik) is dict:
-			i = ik
-		else:
-			i = o['host']
+	for i in scan.hosts:
+		saddress = host_address(i)
+		if saddress is None:
+			continue
 
 		hostcounters = {'po':0,'pc':0,'pf':0,'ostype':{},'pi':{},'ss':{}}
 		hostdetails_html = ''
 		portsfound = False
-		striggered = False
-		lastportid = 0
 
-		saddress = 'noaddress'
-
-		if '@addr' in i['address']:
-			saddress = i['address']['@addr']
-		elif type(i['address']) is list:
-			for ai in i['address']:
-				if ai['@addrtype'] == 'ipv4':
-					saddress = ai['@addr'] 
-
-		addressmd5 = hashlib.md5(str(saddress).encode('utf-8')).hexdigest()
-
-		# collect all labels in labelhost dict
-		labelhost = {}
-		labelfiles = os.listdir('/opt/notes')
-		for lf in labelfiles:
-			m = re.match('^('+scanmd5+')_([a-z0-9]{32,32})\.host\.label$', lf)
-			if m is not None:
-				if m.group(1) not in labelhost:
-					labelhost[m.group(1)] = {}
-				labelhost[m.group(1)][m.group(2)] = open('/opt/notes/'+lf, 'r').read()
-
-		# collect all notes in noteshost dict
-		noteshost = {}
-		notesfiles = os.listdir('/opt/notes')
-		for nf in notesfiles:
-			m = re.match('^('+scanmd5+')_([a-z0-9]{32,32})\.notes$', nf)
-			if m is not None:
-				if m.group(1) not in noteshost:
-					noteshost[m.group(1)] = {}
-				noteshost[m.group(1)][m.group(2)] = open('/opt/notes/'+nf, 'r').read()
+		addressmd5 = md5(saddress)
 
 		if i['status']['@state'] == 'up':
 			labelout = ''
-			if scanmd5 in labelhost:
-				if addressmd5 in labelhost[scanmd5]:
-					labelcolor = labelToColor(labelhost[scanmd5][addressmd5])
-					# labelmargin = labelToMargin(labelhost[scanmd5][addressmd5])
-					labelout = '<span style="" class="label '+labelcolor+'">'+html.escape(labelhost[scanmd5][addressmd5])+'</span>'
+			if addressmd5 in labelhost:
+				labelcolor = labelToColor(labelhost[addressmd5])
+				labelout = '<span style="" class="label '+labelcolor+'">'+html.escape(labelhost[addressmd5])+'</span>'
 
 			hostdetails_html += '<div style="page-break-before: always;">'
 			hostdetails_html += '	<h2>'+html.escape(saddress)+' '+labelout+'</h2> '
@@ -97,144 +64,87 @@ def reportPDFView(request):
 			hostdetails_html += 'Reason: '+html.escape(i['status']['@reason'])+', '
 			hostdetails_html += 'TTL: '+html.escape(i['status']['@reason_ttl'])+'</span>'
 
-			if 'hostsup' in counters:
-				counters['hostsup'] = (counters['hostsup'] + 1)
-			else:
-				counters['hostsup'] = 1
+			counters['hostsup'] = (counters['hostsup'] + 1)
 
 		hostdetails_html_tr = ''
 		portdetails_html_tr = ''
-		if 'ports' in i and 'port' in i['ports']:
-			for pobj in i['ports']['port']:
-				if type(pobj) is dict:
-					p = pobj
+		for p in unique_ports(i):
+			if p['state']['@state'] == 'closed':
+				counters['pc'] = (counters['pc'] + 1)
+				hostcounters['pc'] = (hostcounters['pc'] + 1)
+			elif p['state']['@state'] == 'open':
+				counters['po'] = (counters['po'] + 1)
+				hostcounters['po'] = (hostcounters['po'] + 1)
+			elif p['state']['@state'] == 'filtered':
+				counters['pf'] = (counters['pf'] + 1)
+				hostcounters['pf'] = (hostcounters['pf'] + 1)
+
+			if '@ostype' in p['service']:
+				counters['ostype'][p['service']['@ostype']] = counters['ostype'].get(p['service']['@ostype'], 0) + 1
+
+			counters['ss'][p['service']['@name']] = counters['ss'].get(p['service']['@name'], 0) + 1
+			counters['pi'][p['@portid']] = counters['pi'].get(p['@portid'], 0) + 1
+
+			hdhtml_product = ''
+			if '@product' in p['service']:
+				hdhtml_product = html.escape(p['service']['@product'])
+			else:
+				hdhtml_product = '<i class="grey-text">No Product</i>'
+
+			hdhtml_version = ''
+			if '@version' in p['service']:
+				hdhtml_version = html.escape(p['service']['@version'])
+			else:
+				hdhtml_version = '<i class="grey-text">No Version</i>'
+
+			hdhtml_protocolor = 'grey'
+			if p['@protocol'] == 'tcp':
+				hdhtml_protocolor = 'blue'
+			elif p['@protocol'] == 'udp':
+				hdhtml_protocolor = 'red'
+
+			hostdetails_html_tr += '<tr>'+\
+			'	<td><span class="'+hdhtml_protocolor+'-text">'+esc(p['@protocol'])+'</span> / <span class=""><b>'+esc(p['@portid'])+'</b></span><br><span class="small">'+esc(p['service']['@name'])+'</span></td>'+\
+			'	<td>'+esc(p['state']['@state'])+'</td>'+\
+			'	<td>'+hdhtml_product+' / '+hdhtml_version+'</td>'+\
+			'</tr>'
+
+			lastscript = ''
+			for script in p['script']:
+				if lastscript != script['@id']:
+					lastscript = script['@id']
 				else:
-					p = i['ports']['port']
+					continue
 
-				if p['@portid'] != lastportid:
-					lastportid = p['@portid']
-				else:
-					continue;
+				if script['@output'].replace('\n','') != '' and script['@id'] not in filterscriptid:
+					portdetails_html_tr += '<div class="extratitle"><b class="red-text">'+html.escape(script['@id'])+'</b> - Address: <b>'+html.escape(saddress)+'</b> - Port: <b>'+esc(p['@portid'])+'</b></div>'+\
+					'<div class="extrainfo">'+html.escape(script['@output']).replace('\n','<br>')+'</div>'
 
-				hdhtml_stateico = ''
-				if p['state']['@state'] == 'closed':
-					hdhtml_stateico = '<i class="fas fa-door-closed red-text"></i>'
-					counters['pc'] = (counters['pc'] + 1)
-					hostcounters['pc'] = (hostcounters['pc'] + 1)
-				elif p['state']['@state'] == 'open':
-					hdhtml_stateico = '<i class="fas fa-door-open green-text"></i>'
-					counters['po'] = (counters['po'] + 1)
-					hostcounters['po'] = (hostcounters['po'] + 1)
-				elif p['state']['@state'] == 'filtered':
-					hdhtml_stateico = '<i class="fas fa-filter grey-text"></i>'
-					counters['pf'] = (counters['pf'] + 1)
-					hostcounters['pf'] = (hostcounters['pf'] + 1)
+			portsfound = True
 
-				if '@ostype' in p['service']:
-					if p['service']['@ostype'] in counters['ostype']:
-						counters['ostype'][p['service']['@ostype']] = (counters['ostype'][p['service']['@ostype']] +1)
-					else:
-						counters['ostype'][p['service']['@ostype']] = 1;
-
-				if p['service']['@name'] in counters['ss']:
-					counters['ss'][p['service']['@name']] = (counters['ss'][p['service']['@name']] + 1)
-				else:
-					counters['ss'][p['service']['@name']] = 1
-
-				if p['@portid'] in counters['pi']:
-					counters['pi'][p['@portid']] = (counters['pi'][p['@portid']] + 1)
-				else:
-					counters['pi'][p['@portid']] = 1
-
-				hdhtml_product = ''
-				if '@product' in p['service']:
-					hdhtml_product = html.escape(p['service']['@product'])
-				else:
-					hdhtml_product = '<i class="grey-text">No Product</i>'
-
-				hdhtml_version = ''
-				if '@version' in p['service']:
-					hdhtml_version = html.escape(p['service']['@version'])
-				else:
-					hdhtml_version = '<i class="grey-text">No Version</i>'
-
-				hdhtml_protocolor = 'grey'
-				if p['@protocol'] == 'tcp':
-					hdhtml_protocolor = 'blue'
-				elif p['@protocol'] == 'udp':
-					hdhtml_protocolor = 'red'
-				
-				hostdetails_html_tr += '<tr>'+\
-				'	<td><span class="'+hdhtml_protocolor+'-text">'+esc(p['@protocol'])+'</span> / <span class=""><b>'+esc(p['@portid'])+'</b></span><br><span class="small">'+esc(p['service']['@name'])+'</span></td>'+\
-				'	<td>'+hdhtml_stateico+' '+esc(p['state']['@state'])+'</td>'+\
-				'	<td>'+hdhtml_product+' / '+hdhtml_version+'</td>'+\
-				'</tr>'
-
-				if 'script' in p:
-					lastscript = ''
-					for ii in p['script']:
-						if type(ii) is dict:
-							script = ii
-						else:
-							script = p['script']
-
-						if lastscript != script['@id']:
-							lastscript = script['@id']
-						else:
-							continue
-
-						if script['@output'].replace('\n','') != '' and script['@id'] not in filterscriptid:
-							portdetails_html_tr += '<div class="extratitle"><b class="red-text">'+html.escape(script['@id'])+'</b> - Address: <b>'+html.escape(saddress)+'</b> - Port: <b>'+esc(p['@portid'])+'</b></div>'+\
-							'<div class="extrainfo">'+html.escape(script['@output']).replace('\n','<br>')+'</div>'
-
-				portsfound = True
-
-		notesout,notesb64 = '',''
-		if scanmd5 in noteshost:
-			if addressmd5 in noteshost[scanmd5]:
-				notesb64 = noteshost[scanmd5][addressmd5]
-				notesout = '<div style="page-break-before: always;">'+\
-				'	<h3>Notes for host '+esc(saddress)+'</h3>'+\
-				'	'+notestohtml(notesb64)+\
-				'</div>'
-
+		notesout = ''
+		if addressmd5 in noteshost:
+			notesout = '<div style="page-break-before: always;">'+\
+			'	<h3>Notes for host '+esc(saddress)+'</h3>'+\
+			'	'+notestohtml(noteshost[addressmd5])+\
+			'</div>'
 
 		cveout,cveout_html = '',''
-		if scanmd5 in cvehost:
-			if addressmd5 in cvehost[scanmd5]:
-				for cveport in cvehost[scanmd5][addressmd5]:
-					cvejson = json.loads(cvehost[scanmd5][addressmd5][cveport])
-					for cveobj in cvejson:
+		if addressmd5 in cvehost:
+			for cveobj in cvehost[addressmd5]:
+				cveout += cvetohtml(cveobj, '<div style="line-height:28px;padding:10px;margin-top:10px;border-bottom:solid #ccc 1px;">')
 
-						cverefout = ''
-						for cveref in cveobj.get('references', []):
-							cverefout += '<a href="'+safeurl(cveref)+'">'+esc(cveref)+'</a><br>'
-
-						cveexdbout = ''
-						if 'exploit-db' in cveobj:
-							cveexdbout = '<br><div class="small" style="line-height:20px;"><b>Exploit DB:</b><br>'
-							for cveexdb in cveobj['exploit-db']:
-								if 'title' in cveexdb:
-									cveexdbout += '<a href="'+safeurl(cveexdb.get('source', ''))+'">'+html.escape(cveexdb['title'])+'</a><br>'
-							cveexdbout += '</div>'
-
-						cveout += '<div style="line-height:28px;padding:10px;margin-top:10px;border-bottom:solid #ccc 1px;">'+\
-						'	<span class="label red">'+esc(cveobj.get('id', ''))+'</span> '+esc(cveobj.get('summary', ''))+'<br><br>'+\
-						'	<div class="small" style="line-height:20px;"><b>References:</b><br>'+cverefout+'</div>'+\
-						cveexdbout+\
-						'</div>'
-
-				cveout_html = '<div style="page-break-before: always;">'+\
-				'	<h3>CVE List for '+esc(saddress)+':</h3>'+\
-				cveout+\
-				'</div>'
+			cveout_html = '<div style="page-break-before: always;">'+\
+			'	<h3>CVE List for '+esc(saddress)+':</h3>'+\
+			cveout+\
+			'</div>'
 
 		if i['status']['@state'] == 'up':
 			hostdetails_html += '<div class="row margintb">'+\
-			'		<div class="col s3"><center><h3><i class="fab fa-creative-commons-sampling"></i> '+str(hostcounters['po']+hostcounters['pc']+hostcounters['pf'])+'</h3>TOTAL PORT</center></div>'+\
-			'		<div class="col s3 bleft""><center><h3><i class="fas fa-door-open green-text"></i> '+str(hostcounters['po'])+'</h3>OPEN PORT</center></div>'+\
-			'		<div class="col s3 bleft"><center><h3><i class="fas fa-door-closed red-text"></i> '+str(hostcounters['pc'])+'</h3>CLOSED PORT</center></div>'+\
-			'		<div class="col s3 bleft"><center><h3><i class="fas fa-filter grey-text"></i> '+str(hostcounters['pf'])+'</h3>FILTERED PORT</center></div>'+\
+			'		<div class="col s3"><center><h3>'+str(hostcounters['po']+hostcounters['pc']+hostcounters['pf'])+'</h3>TOTAL PORT</center></div>'+\
+			'		<div class="col s3 bleft"><center><h3 class="green-text">'+str(hostcounters['po'])+'</h3>OPEN PORT</center></div>'+\
+			'		<div class="col s3 bleft"><center><h3 class="red-text">'+str(hostcounters['pc'])+'</h3>CLOSED PORT</center></div>'+\
+			'		<div class="col s3 bleft"><center><h3 class="grey-text">'+str(hostcounters['pf'])+'</h3>FILTERED PORT</center></div>'+\
 			'	</div>'+\
 			'	<table><thead><tr><th>Protocol / Port</th><th>Port State</th><th>Product / Version</th></tr></thead><tbody>'+\
 			hostdetails_html_tr+\
@@ -244,34 +154,25 @@ def reportPDFView(request):
 			cveout_html
 
 		if portsfound is True:
-			# r['out'] += '1,'
 			hostdetails += hostdetails_html
-		#else:
-		#	r['out'] += '0,'
-
-		# this fix single host report
-		if type(ik) is not dict:
-			break;
-
 
 	html_ports = ''
-	javascript_ports = ''
 	for ii in counters['pi']:
 		html_ports += '<b>'+esc(ii)+'</b> <span class="grey-text">('+str(counters['pi'][ii])+')</span>, '
-		javascript_ports += '['+jsstr(ii)+', '+str(counters['pi'][ii])+'],'
 
 	html_services = ''
-	javascript_services = ''
 	for ii in counters['ss']:
 		html_services += '<b>'+esc(ii)+'</b> <span class="grey-text">('+str(counters['ss'][ii])+')</span>, '
-		javascript_services += '['+jsstr(ii)+', '+str(counters['ss'][ii])+'],'
 
+	top_ports = sorted(counters['pi'].items(), key=lambda x: x[1], reverse=True)[:20]
+	top_services = sorted(counters['ss'].items(), key=lambda x: x[1], reverse=True)[:20]
 
-	r['html'] += '<script type="text/javascript" src="https://www.google.com/jsapi?autoload={%27modules%27:[{%27name%27:%27visualization%27,%27version%27:%271.1%27,%27packages%27:[%27corechart%27,%27sankey%27,%27annotationchart%27]}]}"></script>'+\
-	'<div class="container"><div style="text-align:center;width:100%;">'+\
-	'	<img src="/static/logoblack.png" style="height:60px;" />'+\
+	logo = '<img src="data:image/png;base64,'+_asset('logoblack.png', binary=True)+'" style="height:60px;" />'
+
+	r['html'] += '<div class="container"><div style="text-align:center;width:100%;">'+\
+	'	'+logo+\
 	'	<h1 style="margin-top:300px;">Port Scan Report</h1>'+\
-	'	<span class="subtitle">'+html.escape(request.session['scanfile'].replace('.xml','').replace('_',' '))+'</span><br>'+\
+	'	<span class="subtitle">'+html.escape(scan.name.replace('.xml','').replace('_',' '))+'</span><br>'+\
 	'	<div style="margin-top:200px;font-size:18px;padding:20px;"><table class="striped">'+\
 	'	<thead>'+\
 	'		<tr><th style="min-width:200px;">&nbsp;</th><th></th></tr>'+\
@@ -279,7 +180,7 @@ def reportPDFView(request):
 	'	<tbody>'+\
 	'		<tr><td><b>Arguments:</b></td><td>'+html.escape(o['@args'])+'</td></tr>'+\
 	'		<tr><td><b>Scan started at:</b></td><td>'+html.escape(o['@startstr'])+'</td></tr>'+\
-	'		<tr><td><b>Scan type:</b></td><td>'+html.escape(o['scaninfo']['@type'])+'</td></tr>'+\
+	'		<tr><td><b>Scan type:</b></td><td>'+html.escape(scaninfo_field(o, '@type'))+'</td></tr>'+\
 	'		<tr><td><b>Nmap version:</b></td><td>'+html.escape(o['@version'])+'</td></tr>'+\
 	'	</tbody></table></div>'+\
 	'	<div style="color:#999;margin-top:100px;font-size:18px;"><i>The information contained in these documents is confidential, privileged and only for the information of the intended recipient and may not be used, published or redistributed.</i></div>'+\
@@ -294,9 +195,9 @@ def reportPDFView(request):
 	'	</div>'+\
 	'	<div class="row" style="margin-top:50px;">'+\
 	'		<div class="col s8">'+\
-	'			<div style="width:400px;height:300px;" id="chart_portstatus"></div>'+\
-	'			<div style="width:400px;height:300px;" id="chart_ports"></div>'+\
-	'			<div style="width:400px;height:300px;" id="chart_services"></div>'+\
+	bars('Port Status', [('Open', counters['po']), ('Closed', counters['pc']), ('Filtered', counters['pf'])])+\
+	bars('Ports list (top 20)', top_ports)+\
+	bars('Services list (top 20)', top_services)+\
 	'		</div>'+\
 	'		<div class="col s4" style="border-left:solid #ccc 1px;padding-left:20px;min-height:300px;">'+\
 	'			<b class="subtitle">Total Ports</b><br><span class="subtitle">'+str(counters['pc']+counters['po']+counters['pf'])+'</span><br><br>'+\
@@ -308,84 +209,30 @@ def reportPDFView(request):
 	'		</div>'+\
 	'</div>'
 
-	r['html'] += '<script type="text/javascript">'+\
-	'$(document).ready(function() {'+\
-	'	drawChart();'+\
-	'});'+\
-	'function drawChart() {'+\
-	'	var data = new google.visualization.DataTable();'+\
-	'	data.addColumn("string", "State");'+\
-	'	data.addColumn("number", "Count");'+\
-	'	data.addRows(['+\
-	'		["Open", '+str(counters['po'])+'],'+\
-	'		["Closed", '+str(counters['pc'])+'],'+\
-	'		["Filtered", '+str(counters['pf'])+'],'+\
-	'	]);'+\
-	'	var options = {'+\
-	'		"title":"Port Status",'+\
-	'		"width":500,'+\
-	'		"height":300,'+\
-	'		"is3D": true,'+\
-	'		chartArea: {width:"100%",height:"90%"},'+\
-	'		"legend": {'+\
-	'			"position": "labeled"'+\
-	'		}'+\
-	'	};'+\
-	'	var chart = new google.visualization.PieChart(document.getElementById("chart_portstatus"));'+\
-	'	chart.draw(data, options);'+\
-	''+\
-	'	var data = new google.visualization.DataTable();'+\
-	'	data.addColumn("string", "Ports");'+\
-	'	data.addColumn("number", "Count");'+\
-	'	data.addRows(['+\
-	javascript_ports+\
-	'	]);'+\
-	'	var options = {'+\
-	'		"title":"Ports list",'+\
-	'		"width":500,'+\
-	'		"height":300,'+\
-	'		"is3D": true,'+\
-	'		chartArea: {width:"100%",height:"90%"},'+\
-	'		"legend": {'+\
-	'			"position": "labeled"'+\
-	'		}'+\
-	'	};'+\
-	'	var chart = new google.visualization.PieChart(document.getElementById("chart_ports"));'+\
-	'	chart.draw(data, options);'+\
-	''+\
-	'	var data = new google.visualization.DataTable();'+\
-	'	data.addColumn("string", "Ports");'+\
-	'	data.addColumn("number", "Count");'+\
-	'	data.addRows(['+\
-	javascript_services+\
-	'	]);'+\
-	'	var options = {'+\
-	'		"title":"Services list",'+\
-	'		"width":500,'+\
-	'		"height":300,'+\
-	'		"is3D": true,'+\
-	'		chartArea: {width:"100%",height:"90%"},'+\
-	'		"legend": {'+\
-	'			"position": "labeled"'+\
-	'		}'+\
-	'	};'+\
-	'	var chart = new google.visualization.PieChart(document.getElementById("chart_services"));'+\
-	'	chart.draw(data, options);'+\
-	'}'+\
-	'</script>'
-
 	r['html'] += hostdetails
 
 	r['html'] += ''+\
 	'<div style="page-break-before: always;">'+\
 	'	<div>'+\
 	'		<div style="text-align:center;padding-top:600px;"><b>Generated by</b><br>'+\
-	'			<img src="/static/logoblack.png" style="height:60px;" /><br>'+\
+	'			'+logo+'<br>'+\
 	'			<a href="https://github.com/Rev3rseSecurity/WebMap">https://github.com/Rev3rseSecurity/WebMap</a>'+\
 	'		</div>'+\
 	'	</div>'+\
 	'</div>'
 
-	return render(request, 'nmapreport/report.html', r)
+	r['css'] = mark_safe(_asset('vendor/materialize-1.0.0.min.css') + '\n' + _asset('report.css'))
 
+	return render_to_string('nmapreport/report.html', r)
 
+def reportPDFView(request):
+	# HTML preview of the PDF report. The PDF itself is rendered in-process
+	# by api.genPDF, which no longer calls back into this view over HTTP.
+	try:
+		scan = session_scan(request)
+	except Exception:
+		return HttpResponse('error: scan file not readable', content_type="text/plain", status=400)
+	if scan is None:
+		return HttpResponse('error: scan file not loaded', content_type="text/plain")
+
+	return HttpResponse(render_report(scan))

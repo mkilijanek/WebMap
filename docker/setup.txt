@@ -1,9 +1,14 @@
 echo -e "\n[+] Starting WebMap docker setup"
 echo "[+] Creating required dirs"
-mkdir /tmp/webmap
-echo "[+] Docker run webmap"
-docker run -d --name webmap -h webmap -p 8000:8000 -v /tmp/webmap:/opt/xml rev3rse/webmap
+mkdir -p /tmp/webmap
+echo "[+] Building image from this repository"
+docker build -f docker/Dockerfile -t webmap:local .
+echo "[+] Docker run webmap (bound to localhost only)"
+read -s -p "Choose a WebMap password: " WEBMAP_PASSWORD; echo
+docker run -d --name webmap -h webmap -p 127.0.0.1:8000:8000 \
+    -e DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" \
+    -e WEBMAP_USER=webmap -e WEBMAP_PASSWORD="$WEBMAP_PASSWORD" \
+    -v /tmp/webmap:/opt/xml webmap:local
+unset WEBMAP_PASSWORD
 echo "[+] Done"
-echo -e "\nNow you can point your browser to http://localhost:8000"
-echo "Please, take few seconds to support this project on GitHub"
-echo -e "https://github.com/Rev3rseSecurity/WebMap\n"
+echo -e "\nNow you can point your browser to http://localhost:8000 and log in as 'webmap'"

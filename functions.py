@@ -1,4 +1,4 @@
-import html, json, re, base64, urllib.parse
+import html, json, re, base64, ipaddress, shlex, urllib.parse
 
 def labelToMargin(label):
 	labels = {
@@ -8,8 +8,7 @@ def labelToMargin(label):
 		'Checked':'28px'
 	}
 
-	if label in labels:
-		return labels[label]
+	return labels.get(label, '10px')
 
 def labelToColor(label):
 	labels = {
@@ -19,8 +18,7 @@ def labelToColor(label):
 		'Checked':'blue'
 	}
 
-	if label in labels:
-		return labels[label]
+	return labels.get(label, 'grey')
 
 def fromOSTypeToFontAwesome(ostype):
 	icons = {
@@ -64,3 +62,45 @@ def notestohtml(value):
 	except (ValueError, UnicodeDecodeError):
 		return ''
 	return html.escape(text).replace('\n', '<br>')
+
+def urlhost(address):
+	# Host part of a URL; IPv6 literals need brackets.
+	if ':' in address:
+		return '['+address+']'
+	return address
+
+def is_ip(address):
+	try:
+		ipaddress.ip_address(address)
+		return True
+	except ValueError:
+		return False
+
+def is_portid(value):
+	return re.fullmatch(r'[0-9]{1,5}', str(value)) is not None and 0 < int(value) <= 65535
+
+def shellcmd(*args):
+	# Command line for the clipboard; each argument is shell-quoted. The result
+	# still has to be HTML-escaped when it goes into an attribute.
+	return ' '.join(shlex.quote(str(a)) for a in args)
+
+def cvetohtml(cveobj, opendiv):
+	cverefout = ''
+	refs = cveobj.get('references', [])
+	for cveref in (refs if isinstance(refs, list) else []):
+		cverefout += '<a href="'+safeurl(cveref)+'">'+esc(cveref)+'</a><br>'
+
+	cveexdbout = ''
+	exdb = cveobj.get('exploit-db')
+	if isinstance(exdb, list):
+		cveexdbout = '<br><div class="small" style="line-height:20px;"><b>Exploit DB:</b><br>'
+		for cveexdb in exdb:
+			if isinstance(cveexdb, dict) and 'title' in cveexdb:
+				cveexdbout += '<a href="'+safeurl(cveexdb.get('source', ''))+'">'+esc(cveexdb['title'])+'</a><br>'
+		cveexdbout += '</div>'
+
+	return opendiv+\
+	'	<span class="label red">'+esc(cveobj.get('id', ''))+'</span> '+esc(cveobj.get('summary', ''))+'<br><br>'+\
+	'	<div class="small" style="line-height:20px;"><b>References:</b><br>'+cverefout+'</div>'+\
+	cveexdbout+\
+	'</div>'

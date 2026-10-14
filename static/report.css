@@ -51,3 +51,37 @@ h1 {
 	font-size:12px;
 	color:#fff;
 }
+
+.chart {
+	width:500px;
+	margin-bottom:30px;
+}
+
+.bars {
+	width:100%;
+}
+
+.bars td {
+	padding:2px 4px;
+	font-size:12px;
+}
+
+.barlabel {
+	width:120px;
+	font-family:monospace;
+}
+
+.barcell {
+	width:320px;
+}
+
+.bar {
+	height:14px;
+	background-color:#2196f3;
+}
+
+.barcount {
+	width:50px;
+	text-align:right;
+	color:#666;
+}

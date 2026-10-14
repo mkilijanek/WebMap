@@ -3,14 +3,14 @@
   <html>
     <head>
       <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+      <link rel="stylesheet" href="{% static "vendor/materialize-1.0.0.min.css" %}">
       <link rel="stylesheet" href="{% static "/custom.css" %}">
 		<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.3.1/css/all.css" integrity="sha384-mzrmE5qonljUremFsqc01SB46JvROS7bZs3IO2EmfFsd15uHvIt+Y8vEf7N7fWAU" crossorigin="anonymous">
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+      <!-- All scripts are served from this app (static/vendor), none from third parties. -->
+      <script src="{% static "vendor/jquery-3.7.1.min.js" %}"></script>
       <script src="{% static "/async.js" %}"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.js"></script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.0/clipboard.min.js"></script>
-		<script src="https://buttons.github.io/buttons.js"></script>
+      <script src="{% static "vendor/Chart-2.9.4.min.js" %}"></script>
+		<script src="{% static "vendor/clipboard-2.0.11.min.js" %}"></script>
       <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     </head>
 
@@ -20,12 +20,14 @@
 		<div class="navbar-fixed">
 			<nav style="background-color:rgba(0,0,0,0.8);">
 				<div class="nav-wrapper">
-					<div class="left scantitle" id="scantitle">
-					</div>
+					<div class="left scantitle" id="scantitle">{{ scantitle }}</div>
 					<a href="/" class="brand-logo center"><img src="/static/logo.png" style="height:28px;" /></a>
 					<ul class="right hide-on-med-and-down">
-						<li><a href="/setscanfile/unset">Scan List</a></li>
+						<li><form method="post" action="/setscanfile/unset">{% csrf_token %}<button type="submit" class="btn-flat white-text navbtn">Scan List</button></form></li>
 						<li><a href="/">Scan Detail</a></li>
+						{% if user.is_authenticated %}
+						<li><form method="post" action="/logout/">{% csrf_token %}<button type="submit" class="btn-flat white-text navbtn">Logout</button></form></li>
+						{% endif %}
 					</ul>
 				</div>
 			</nav>
@@ -83,7 +85,7 @@
 			{% csrf_token %}
 		</div>
 
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+		<script src="{% static "vendor/materialize-1.0.0.min.js" %}"></script>
 		<script>
 			$(document).ready(function(){
 				$('.sidenav').sidenav();

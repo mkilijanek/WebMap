@@ -118,7 +118,7 @@ def validate_port_number(port_string):
 
 def validate_ip_address(ip_string):
     """
-    Validate IPv4 address format.
+    Validate an IPv4 or IPv6 address.
 
     Args:
         ip_string: IP address string
@@ -132,10 +132,20 @@ def validate_ip_address(ip_string):
     import ipaddress
 
     try:
-        ipaddress.IPv4Address(ip_string)
+        ipaddress.ip_address(ip_string)
         return ip_string
-    except (ValueError, ipaddress.AddressValueError):
-        raise ValidationError('Invalid IPv4 address')
+    except (ValueError, TypeError):
+        raise ValidationError('Invalid IP address')
+
+
+def validate_host_address(value):
+    """
+    Validate a host identifier as used by the reports: an IPv4 or IPv6
+    address, or a MAC address for hosts nmap reported without an IP.
+    """
+    if isinstance(value, str) and re.match(r'^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$', value):
+        return value
+    return validate_ip_address(value)
 
 
 def validate_cpe_string(cpe_string, max_length=200):
@@ -158,8 +168,10 @@ def validate_cpe_string(cpe_string, max_length=200):
     if len(cpe_string) > max_length:
         raise ValidationError(f'CPE string too long (max {max_length} characters)')
 
-    # CPE format: cpe:/[o|a|h]:vendor:product:version...
-    if not re.match(r'^cpe:/[oah]:[a-zA-Z0-9_\-\.:/]+$', cpe_string):
+    # CPE 2.2 URI: cpe:/[o|a|h]:vendor:product:version... No '/' after the
+    # prefix and no '..', so the value cannot add path segments to the
+    # CVE API URL it is appended to.
+    if not re.match(r'^cpe:/[oah](:[A-Za-z0-9_\-\.~+]*)+$', cpe_string) or '..' in cpe_string:
         raise ValidationError('Invalid CPE format')
 
     return cpe_string
