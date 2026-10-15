@@ -1,12 +1,16 @@
 import hashlib, json, os, re, threading
+from collections import OrderedDict
 import xmltodict
 from xml.parsers.expat import ExpatError
 from django.core.exceptions import ValidationError
 from .security_utils import safe_join, validate_filename, validate_host_address
 
-XML_DIR = '/opt/xml'
-NOTES_DIR = '/opt/notes'
+XML_DIR = os.environ.get('WEBMAP_XML_DIR', '/opt/xml')
+NOTES_DIR = os.environ.get('WEBMAP_NOTES_DIR', '/opt/notes')
 MAX_XML_BYTES = int(os.environ.get('WEBMAP_MAX_XML_MB', '100')) * 1024 * 1024
+# Parsed scans kept in memory. A 100 MB XML file parses into a much larger
+# dict tree, so only the most recently used few are kept.
+CACHE_SIZE = int(os.environ.get('WEBMAP_SCAN_CACHE', '4'))
 
 # Elements that nmap may emit once or many times. Forcing them to lists means
 # callers never have to guess whether they got a dict or a list.
@@ -32,7 +36,7 @@ class Scan:
 		return self.data.get('host') or []
 
 
-_cache = {}
+_cache = OrderedDict()
 _cache_lock = threading.Lock()
 
 
@@ -95,8 +99,9 @@ def load_scan(filename):
 	stamp = (st.st_mtime_ns, st.st_size, st.st_ino)
 	with _cache_lock:
 		hit = _cache.get(path)
-	if hit is not None and hit[0] == stamp:
-		return hit[1]
+		if hit is not None and hit[0] == stamp:
+			_cache.move_to_end(path)
+			return hit[1]
 
 	try:
 		with open(path, 'rb') as f:
@@ -120,6 +125,9 @@ def load_scan(filename):
 
 	with _cache_lock:
 		_cache[path] = (stamp, scan)
+		_cache.move_to_end(path)
+		while len(_cache) > max(CACHE_SIZE, 1):
+			_cache.popitem(last=False)
 	return scan
 
 
@@ -174,6 +182,12 @@ def unique_ports(host):
 			continue
 		seen.add(k)
 		yield p
+
+
+def host_keys(scan):
+	"""md5(address) of every host in the scan: the only keys annotations
+	(labels, notes) may be stored under."""
+	return {md5(a) for a in (host_address(h) for h in scan.hosts) if a is not None}
 
 
 def find_host(scan, address):

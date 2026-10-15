@@ -5,10 +5,11 @@ from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_not_required
 from django.urls import include, path, re_path
 from django.views.static import serve
+from nmapreport.auth import ThrottledLoginView
 
 urlpatterns = [
 	# Before the app include: its '<address>/' pattern would match 'login/'.
-	path('login/', auth_views.LoginView.as_view(), name='login'),
+	path('login/', ThrottledLoginView.as_view(), name='login'),
 	path('logout/', auth_views.LogoutView.as_view(), name='logout'),
 	# App assets (CSS, JS, images) only; PDF reports are no longer written
 	# here but returned directly by the authenticated api/pdf/ view.

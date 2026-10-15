@@ -3,15 +3,21 @@ Security utilities for WebMap application
 Provides input validation and secure file operations
 """
 
+import base64
+import binascii
+import ipaddress
 import os
 import re
+from urllib.parse import unquote
+
 from django.core.exceptions import SuspiciousFileOperation, ValidationError
 
 
 def safe_join(base_dir, *paths):
     """
     Safely join paths and ensure result is within base_dir.
-    Prevents path traversal attacks.
+    Prevents path traversal attacks. Symlinks are resolved first, so a link
+    inside base_dir cannot point the result somewhere else.
 
     Args:
         base_dir: Base directory that result must be within
@@ -23,13 +29,11 @@ def safe_join(base_dir, *paths):
     Raises:
         SuspiciousFileOperation: If path traversal detected
     """
-    final_path = os.path.abspath(os.path.join(base_dir, *paths))
-    base_path = os.path.abspath(base_dir)
+    base_path = os.path.realpath(base_dir)
+    final_path = os.path.realpath(os.path.join(base_path, *paths))
 
-    if not final_path.startswith(base_path + os.sep) and final_path != base_path:
-        raise SuspiciousFileOperation(
-            f'Path traversal detected: attempted to access {final_path} outside {base_path}'
-        )
+    if os.path.commonpath([base_path, final_path]) != base_path:
+        raise SuspiciousFileOperation('Path traversal detected')
 
     return final_path
 
@@ -129,8 +133,6 @@ def validate_ip_address(ip_string):
     Raises:
         ValidationError: If not a valid IP address
     """
-    import ipaddress
-
     try:
         ipaddress.ip_address(ip_string)
         return ip_string
@@ -223,42 +225,6 @@ def validate_object_type(obj_type):
     return obj_type
 
 
-def sanitize_notes_content(content, max_length=10000):
-    """
-    Sanitize notes content.
-
-    Args:
-        content: Notes content
-        max_length: Maximum allowed length
-
-    Returns:
-        Sanitized content
-
-    Raises:
-        ValidationError: If content is invalid
-    """
-    if not content:
-        raise ValidationError('Notes content cannot be empty')
-
-    if len(content) > max_length:
-        raise ValidationError(f'Notes content too long (max {max_length} characters)')
-
-    # Basic XSS prevention - remove script tags
-    dangerous_patterns = [
-        r'<script[^>]*>.*?</script>',
-        r'javascript:',
-        r'onerror=',
-        r'onload=',
-        r'onclick=',
-        r'<iframe',
-    ]
-
-    for pattern in dangerous_patterns:
-        if re.search(pattern, content, re.IGNORECASE | re.DOTALL):
-            raise ValidationError('Potentially dangerous content detected')
-
-    return content
-
 
 def validate_notes_b64(value, max_length=10240):
     """
@@ -272,10 +238,6 @@ def validate_notes_b64(value, max_length=10240):
 
     if not re.match(r'^[A-Za-z0-9%+/=]*$', value):
         raise ValidationError('Invalid notes encoding')
-
-    import base64
-    import binascii
-    from urllib.parse import unquote
 
     try:
         base64.b64decode(unquote(value), validate=True).decode('utf-8')

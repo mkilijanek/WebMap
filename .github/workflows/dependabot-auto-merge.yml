@@ -1,72 +1,48 @@
 name: Dependabot Auto-Merge
 
+# Patch-level updates opened by Dependabot are queued for auto-merge; they
+# merge only once the checks required by branch protection pass (configure
+# "Require status checks to pass" on v2/master, otherwise auto-merge merges
+# immediately). Minor and major updates always wait for a human review.
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   auto-merge:
-    name: Auto-merge Dependabot PRs
+    name: Auto-merge Dependabot patch updates
     runs-on: ubuntu-latest
-
-    # Only run for Dependabot PRs
-    if: github.actor == 'dependabot[bot]'
+    # The PR author, not github.actor: actor is whoever triggered this run
+    # (for example someone re-running it or pushing to the branch).
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Fetch Dependabot metadata
         id: metadata
-        uses: dependabot/fetch-metadata@8348ea7f5d949b08c7f125a44b569c9626b05db3 # v1.7.0
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2.5.0
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Auto-merge for security updates
-        # Auto-merge CRITICAL and HIGH severity security updates
-        if: |
-          steps.metadata.outputs.update-type == 'version-update:semver-patch' &&
-          (steps.metadata.outputs.alert-state == 'CRITICAL' ||
-           steps.metadata.outputs.alert-state == 'HIGH')
-        run: |
-          gh pr merge --auto --squash "$PR_URL"
+      - name: Enable auto-merge for patch updates
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Comment on PR
-        if: steps.metadata.outputs.alert-state != ''
-        uses: actions/github-script@v8
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `🤖 **Dependabot Security Update**
-
-              - **Severity**: ${{ steps.metadata.outputs.alert-state }}
-              - **Update Type**: ${{ steps.metadata.outputs.update-type }}
-              - **Dependency**: ${{ steps.metadata.outputs.dependency-names }}
-
-              ${steps.metadata.outputs.alert-state === 'CRITICAL' || steps.metadata.outputs.alert-state === 'HIGH'
-                ? '✅ This PR will be auto-merged after CI passes.'
-                : '⚠️ Manual review required for this update.'}
-              `
-            })
-
-      - name: Enable auto-merge for minor/patch updates
-        # Auto-approve patch and minor version updates (not major)
-        if: |
-          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
-          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+      - name: Note that a review is needed
+        if: steps.metadata.outputs.update-type != 'version-update:semver-patch'
         run: |
-          gh pr review --approve "$PR_URL"
-          gh pr merge --auto --squash "$PR_URL"
+          gh pr comment "$PR_URL" --body "Dependabot ${UPDATE_TYPE#version-update:} update of ${DEPS} needs a manual review before merging."
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+          DEPS: ${{ steps.metadata.outputs.dependency-names }}

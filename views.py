@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.core.exceptions import SuspiciousFileOperation, ValidationError
 from django.middleware.csrf import get_token
+from django.utils.html import json_script
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_POST
 import json, html, urllib.parse, base64
@@ -13,7 +14,10 @@ from nmapreport.scan import (
 def scan_error(request, err):
 	# A broken or half-written XML file must not take the whole UI down.
 	msg = str(err) if isinstance(err, ScanError) else 'invalid scan file'
-	return render(request, 'nmapreport/index.html', { 'out': '', 'table': '', 'scaninfo': '<span class="card-title">Cannot load scan</span><p>'+esc(msg)+'</p>', 'scandetails': '', 'trhost': '' }, status=400)
+	return render(request, 'nmapreport/index.html', { 'table': '', 'scaninfo': '<span class="card-title">Cannot load scan</span><p>'+esc(msg)+'</p>', 'scandetails': '', 'trhost': '' }, status=400)
+
+def counter(icon, value, label):
+	return '<center><h4><i class="'+icon+'"></i> '+str(value)+'</h4><span class="small grey-text">'+label+'</span></center>'
 
 def postbutton(request, action, label, cls):
 	# Session state changes go through POST + CSRF instead of plain links.
@@ -33,9 +37,6 @@ def setscanfile(request, scanfile):
 
 	return redirect('/')
 
-
-def port(request, port):
-	return render(request, 'nmapreport/index.html', { 'out': '', 'table': '', 'scaninfo': '', 'scandetails': '', 'trhost': '' })
 
 def details(request, address):
 	r = {}
@@ -70,9 +71,9 @@ def details(request, address):
 
 		r['scaninfo'] = '<div class="row">'+\
 		'	<div class="col s3"><span class="card-title">Host Details:</span><h6>'+html.escape(address)+'</h6>'+h+labelout+'</div>'+\
-		'	<div class="col s3" id="detailspo"></div>'+\
-		'	<div class="col s3" id="detailspc"></div>'+\
-		'	<div class="col s3" id="detailspf"></div>'+\
+		'	<div class="col s3">{po}</div>'+\
+		'	<div class="col s3">{pc}</div>'+\
+		'	<div class="col s3">{pf}</div>'+\
 		'</div>'
 
 		for p in unique_ports(i):
@@ -159,18 +160,11 @@ def details(request, address):
 		'	</div>'+\
 		'</div>'
 
-	r['pretable'] = '<script> '+\
-	'$(document).ready(function() { '+\
-	'	var clipboard = new ClipboardJS(".btncpy"); '+\
-	'	clipboard.on("success", function(e) { '+\
-	'		M.toast({html: "Copied to clipboard"}); '+\
-	'	}); '+\
-	'	$(".dropdown-trigger").dropdown(); '+\
-	'	$("#detailspo").html(\'<center><h4><i class="fas fa-door-open green-text"></i> '+str(po)+'</h4><span class="small grey-text">OPEN PORTS</span></center>\');'+\
-	'	$("#detailspc").html(\'<center><h4><i class="fas fa-door-closed red-text"></i> '+str(pc)+'</h4><span class="small grey-text">CLOSED PORTS</span></center>\');'+\
-	'	$("#detailspf").html(\'<center><h4><i class="fas fa-filter grey-text"></i> '+str(pf)+'</h4><span class="small grey-text">FILTERED PORTS</span></center>\');'+\
-	'}); '+\
-	'</script>'
+	if i is not None:
+		# filled in once the ports are counted; the page has no inline script
+		r['scaninfo'] = r['scaninfo'].replace('{po}', counter('fas fa-door-open green-text', po, 'OPEN PORTS'), 1)\
+			.replace('{pc}', counter('fas fa-door-closed red-text', pc, 'CLOSED PORTS'), 1)\
+			.replace('{pf}', counter('fas fa-filter grey-text', pf, 'FILTERED PORTS'), 1)
 
 	return render(request, 'nmapreport/index.html', r)
 
@@ -250,9 +244,9 @@ def index(request, filterservice="", filterportid=""):
 	'		<i class="large material-icons">mode_edit</i>'+\
 	'	</a>'+\
 	'	<ul>'+\
-	'		<li><a class="btn-floating red tooltipped" data-position="left" data-tooltip="PDF Report" onclick="javascript:genPDF();"><i class="material-icons">insert_chart</i></a></li>'+\
-	'		<li><a class="btn-floating blue darken-1 tooltipped" data-position="left" data-tooltip="Hide/Show hosts with no open ports" onclick="javascript:$(\'.zeroportopen\').fadeToggle();"><i class="material-icons">view_day</i></a></li>'+\
-	'		<li><a class="btn-floating orange tooltipped" data-position="left" data-tooltip="Check for CVE and Exploits on all hosts" onclick="javascript:checkCVE();"><i class="fas fa-bolt"></i></a></li>'+\
+	'		<li><a class="btn-floating red tooltipped" data-position="left" data-tooltip="PDF Report" data-action="genpdf"><i class="material-icons">insert_chart</i></a></li>'+\
+	'		<li><a class="btn-floating blue darken-1 tooltipped" data-position="left" data-tooltip="Hide/Show hosts with no open ports" data-action="togglezero"><i class="material-icons">view_day</i></a></li>'+\
+	'		<li><a class="btn-floating orange tooltipped" data-position="left" data-tooltip="Check for CVE and Exploits on all hosts" data-action="checkcve"><i class="fas fa-bolt"></i></a></li>'+\
 	'	</ul>'+\
 	'</div>'
 
@@ -353,8 +347,8 @@ def index(request, filterservice="", filterportid=""):
 			notesout,notesb64,removenotes = '','',''
 			if addressmd5 in noteshost:
 				notesb64 = noteshost[addressmd5]
-				notesout = '<br><a id="noteshost'+str(hostindex)+'" href="#!" onclick="javascript:openNotes(\''+addressmd5+'\', \''+safenotesb64(notesb64)+'\');" class="small"><i class="fas fa-comment"></i> contains notes</a>'
-				removenotes = '<li><a href="#!" onclick="javascript:removeNotes(\''+addressmd5+'\', \''+str(hostindex)+'\');">Remove notes</a></li>'
+				notesout = '<br><a id="noteshost'+str(hostindex)+'" href="#!" data-action="opennotes" data-hash="'+addressmd5+'" data-notes="'+esc(safenotesb64(notesb64))+'" class="small"><i class="fas fa-comment"></i> contains notes</a>'
+				removenotes = '<li><a href="#!" data-action="rmnotes" data-hash="'+addressmd5+'" data-index="'+str(hostindex)+'">Remove notes</a></li>'
 
 			cveout = ''
 			if addressmd5 in cvehost:
@@ -383,13 +377,13 @@ def index(request, filterservice="", filterportid=""):
 				'	<td style="font-size:12px;">'+str(tdports[0:-2])+'</td>'+\
 				'	<td>'+\
 				'		<ul id="hostdd'+str(hostindex)+'" class="dropdown-content" style="min-width:200px;">'+\
-				'			<li><a href="#!" onclick="javascript:setLabel(\'host\', \'Vulnerable\', \''+addressmd5+'\', '+str(hostindex)+');"><span class="tmlabel red">Vulnerable</span></a></li>'+\
-				'			<li><a href="#!" onclick="javascript:setLabel(\'host\', \'Critical\', \''+addressmd5+'\', '+str(hostindex)+');"><span class="tmlabel black">Critical</span></a></li>'+\
-				'			<li><a href="#!" onclick="javascript:setLabel(\'host\', \'Warning\', \''+addressmd5+'\', '+str(hostindex)+');"><span class="tmlabel orange"><span class="tmlabel orange">Warning</span></a></li>'+\
-				'			<li><a href="#!" onclick="javascript:setLabel(\'host\', \'Checked\', \''+addressmd5+'\', '+str(hostindex)+');"><span class="tmlabel blue"><span class="tmlabel blue">Checked</span></a></li>'+\
-				'			<li><a href="#!" onclick="javascript:removeLabel(\'host\', \''+addressmd5+'\', '+str(hostindex)+');">Remove label</a></li>'+\
+				'			<li><a href="#!" data-action="setlabel" data-type="host" data-label="Vulnerable" data-hash="'+addressmd5+'" data-index="'+str(hostindex)+'"><span class="tmlabel red">Vulnerable</span></a></li>'+\
+				'			<li><a href="#!" data-action="setlabel" data-type="host" data-label="Critical" data-hash="'+addressmd5+'" data-index="'+str(hostindex)+'"><span class="tmlabel black">Critical</span></a></li>'+\
+				'			<li><a href="#!" data-action="setlabel" data-type="host" data-label="Warning" data-hash="'+addressmd5+'" data-index="'+str(hostindex)+'"><span class="tmlabel orange">Warning</span></a></li>'+\
+				'			<li><a href="#!" data-action="setlabel" data-type="host" data-label="Checked" data-hash="'+addressmd5+'" data-index="'+str(hostindex)+'"><span class="tmlabel blue">Checked</span></a></li>'+\
+				'			<li><a href="#!" data-action="rmlabel" data-type="host" data-hash="'+addressmd5+'" data-index="'+str(hostindex)+'">Remove label</a></li>'+\
 				'			<li class="divider"></li>'+\
-				'			<li><a href="#!" onclick="javascript:openNotes(\''+addressmd5+'\', \''+safenotesb64(notesb64)+'\');">Insert notes</a></li>'+\
+				'			<li><a href="#!" data-action="opennotes" data-hash="'+addressmd5+'" data-notes="'+esc(safenotesb64(notesb64))+'">Insert notes</a></li>'+\
 				'			'+removenotes+\
 				'		</ul>'+\
 				labelout+\
@@ -397,6 +391,38 @@ def index(request, filterservice="", filterportid=""):
 				'	</td>'+\
 				'</tr>'
 				hostindex = (hostindex + 1)
+
+	allss = ''
+	ssclabels, sscdata = [], []
+	allssc = 0
+	for i in sorted(sscount, key=sscount.__getitem__, reverse=True):
+		if allssc <= 30:
+			if filterservice != i:
+				allss += '<a href="/report/service/'+esc(urllib.parse.quote(i, safe=''))+'/">'+html.escape(i)+'('+str(sscount[i])+')</a>, '
+			else:
+				allss += '<span class="tmlabel" style="background-color:#ffcc00;color:#333;">'+html.escape(i)+'</span>, '
+
+			ssclabels.append(i)
+			sscdata.append(sscount[i])
+			allssc = (allssc + 1)
+
+	toppilabels, toppidata = [], []
+	allpilinks = ''
+	allpic = 1
+	for i in sorted(picount, key=picount.__getitem__, reverse=True):
+		if allpic <= 5:
+			allpilinks += '<a href="/report/portid/'+esc(urllib.parse.quote(i, safe=''))+'/">'+esc(i)+'</a>, '
+			toppilabels.append(i)
+			toppidata.append(picount[i])
+			allpic = (allpic + 1)
+		elif allpic <= 10:
+			allpilinks += '<a href="/report/portid/'+esc(urllib.parse.quote(i, safe=''))+'/">'+esc(i)+'</a>, '
+			allpic = (allpic + 1)
+
+	allostypelinks = ''
+	for i in sorted(allostypelist, key=allostypelist.__getitem__, reverse=True):
+		allostypelinks += '<a href="">'+esc(i)+'</a>, '
+
 
 	totports = (ports['open']+ports['closed']+ports['filtered'])
 	if filterservice == "" and filterportid == "":
@@ -409,7 +435,7 @@ def index(request, filterservice="", filterportid=""):
 		'	Open Ports: '+str(ports['open'])+'<br>'+\
 		'	Closed Ports: '+str(ports['closed'])+'<br>'+\
 		'	Filtered Ports: '+str(ports['filtered'])+'<br>'
-		scaninfobox3 = '<div id="detailstopports"></div>'
+		scaninfobox3 = '<span class="small">'+allss[0:-2]+'</span>'
 
 	r['scaninfo'] = ''+\
 	'<div class="row">'+\
@@ -441,40 +467,6 @@ def index(request, filterservice="", filterportid=""):
 	'</div>'
 
 
-	allss = ''
-	allsslabels = ''
-	allssdata = ''
-	allssc = 0
-	for i in sorted(sscount, key=sscount.__getitem__, reverse=True):
-		if allssc <= 30:
-			if filterservice != i:
-				allss += '<a href="/report/service/'+esc(urllib.parse.quote(i, safe=''))+'/">'+html.escape(i)+'('+str(sscount[i])+')</a>, '
-			else:
-				allss += '<span class="tmlabel" style="background-color:#ffcc00;color:#333;">'+html.escape(i)+'</span>, '
-
-			allsslabels += jsstr(i)+', '
-			allssdata += ''+str(sscount[i])+','
-			allssc = (allssc + 1)
-
-	allpilabels = ''
-	allpidata = ''
-	allpilinks = ''
-	allpic = 1
-	for i in sorted(picount, key=picount.__getitem__, reverse=True):
-		if allpic <= 5:
-			allpilinks += '<a href="/report/portid/'+esc(urllib.parse.quote(i, safe=''))+'/">'+esc(i)+'</a>, '
-			allpilabels += jsstr(i)+', '
-			allpidata += ''+str(picount[i])+','
-			allpic = (allpic + 1)
-		elif allpic <= 10:
-			allpilinks += '<a href="/report/portid/'+esc(urllib.parse.quote(i, safe=''))+'/">'+esc(i)+'</a>, '
-			allpic = (allpic + 1)
-
-	allostypelinks = ''
-	for i in sorted(allostypelist, key=allostypelist.__getitem__, reverse=True):
-		allostypelinks += '<a href="">'+esc(i)+'</a>, '
-
-
 	r['pretable'] = ''
 	if filterservice == "" and filterportid == "":
 		r['pretable'] += '<div class="row">'+\
@@ -497,35 +489,15 @@ def index(request, filterservice="", filterportid=""):
 		'	</div>'+\
 		'</div>'
 
-		r['pretable'] += '<script>'+\
-		'	$(document).ready(function() {'+\
-		'		var ctx = document.getElementById("chart1").getContext("2d");'+\
-		'		var myChart = new Chart(ctx, {'+\
-		'			type: "doughnut", data: {labels:["Open", "Filtered", "Closed"], datasets: [{ data: ['+str(ports['open'])+','+str(ports['filtered'])+','+str(ports['closed'])+'], backgroundColor:["rgba(0,200,0,0.8)","rgba(255,200,0,0.8)","rgba(255,0,0,0.8)"], borderColor:"#3e3e3e" }]}, options: {legend: { position: "right", labels: { fontColor: "#cccccc" }  }}'+\
-		'		});'+\
-		'		var ctx = document.getElementById("chart3").getContext("2d");'+\
-		'		var myChart = new Chart(ctx, {'+\
-		'			type: "doughnut", data: {labels:['+allpilabels[0:-2]+'], datasets: [{ data: ['+allpidata[0:-1]+'], borderColor: "#3e3e3e",  backgroundColor:["#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231", "#911eb4", "#46f0f0", "#f032e6", "#bcf60c", "#fabebe", "#008080", "#e6beff", "#9a6324", "#fffac8", "#800000", "#aaffc3", "#808000", "#ffd8b1", "#000075", "#808080", "#ffffff", "#000000"] }]}, options: {legend: { position: "right", labels: { fontColor: "#cccccc" }}}'+\
-		'		});'+\
-		'		var ctx = document.getElementById("chart2").getContext("2d");'+\
-		'		var myChart = new Chart(ctx, {'+\
-		'			type: "horizontalBar", data: { labels:['+allsslabels[0:-2]+'], datasets: [{ data: ['+allssdata[0:-1]+'], backgroundColor: "rgba(0,140,220,0.8)" }]}, options: {legend: { display: false }, scales: { xAxes: [{ ticks: { beginAtZero: true, fontColor: "#cccccc" } }], yAxes: [{ ticks: { fontColor: "#cccccc" } }] }  }'+\
-		'		});'+\
-		'	});'+\
-		'</script>'
+		# Chart data travels as JSON (not executed); static/async.js draws the
+		# charts, so the page needs no inline script.
+		r['pretable'] += json_script({
+			'ports': [ports['open'], ports['filtered'], ports['closed']],
+			'toplabels': toppilabels, 'topdata': toppidata,
+			'servicelabels': ssclabels, 'servicedata': sscdata,
+		}, 'chartdata')
 
-	r['pretable'] += '<script>'+\
-	'	$(document).ready(function() {'+\
-	'		$(".dropdown-trigger").dropdown();'+\
-	'		$(".tooltipped").tooltip();'+\
-	'		$(".perco").each(function() { '+\
-	'			var pwidth = ( (($(this).attr("data-po") * 100) / '+str(totports or 1)+') ); '+\
-	'			$(this).css("width", pwidth+"%" ); '+\
-	'			if($(this).attr("data-po") < 1) { $(this).html("&nbsp;"); $(this).css("background-color","#666") } '+\
-	'		});'+\
-	'	$("#detailstopports").html('+jsstr('<span class="small">'+allss[0:-2]+'</span>')+');'+\
-	'	});'+\
-	'</script>'
+	r['pretable'] += '<span id="percototal" data-total="'+str(totports or 1)+'" hidden></span>'
 
 	r['pretable'] += ' <input type="hidden" id="cpestring" value="'+urllib.parse.quote_plus(base64.b64encode(json.dumps(cpe).encode()))+'" /> '
 

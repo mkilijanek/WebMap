@@ -1,399 +1,121 @@
-# Security Policy and Best Practices
-
-## Overview
-
-This document outlines the security improvements implemented in WebMap and provides guidelines for secure deployment and operation.
-
-## Security Improvements Summary
-
-### Critical Fixes Implemented ✅
-
-1. **Command Injection Prevention (CVE-001)**
-   - Replaced `os.popen()` with `subprocess.run()`
-   - Command arguments passed as list (no shell interpretation)
-   - Added timeout protection (30 seconds)
-   - File: `api.py:178-228`
-
-2. **Path Traversal Protection (CVE-002)**
-   - Implemented `safe_join()` function for secure path operations
-   - Added filename validation (alphanumeric, dash, underscore, dot only)
-   - Prevents `../` and absolute path attacks
-   - File: `security_utils.py`, applied throughout `api.py`
-
-3. **Secure Django Configuration (CVE-003, CVE-004, CVE-005)**
-   - `SECRET_KEY` from environment variable with auto-generation fallback
-   - `DEBUG = False` by default (configurable via environment)
-   - `ALLOWED_HOSTS` restricted to localhost by default
-   - File: `docker/settings.py:11-36`
-
-4. **Input Validation (CVE-008, CVE-009)**
-   - Comprehensive validation for all user inputs
-   - IP address validation
-   - Port number validation (1-65535)
-   - MD5 hash validation
-   - CPE string validation
-   - File: `security_utils.py`
-
-5. **XXE Protection (CVE-007)**
-   - Added `disable_entities=True` to XML parsing
-   - File: `api.py:143`
-
-6. **CSRF Protection (CVE-008)**
-   - Added `@csrf_protect` decorators to POST endpoints
-   - Added `@require_http_methods(['POST'])` decorators
-   - Files: `api.py:39, api.py:230`
-
-7. **Security Headers (CVE-013)**
-   - `X-Frame-Options: DENY`
-   - `X-Content-Type-Options: nosniff`
-   - `Referrer-Policy: same-origin`
-   - Content Security Policy (CSP) configuration
-   - File: `docker/settings.py:133-167`
-
-8. **Session Security (CVE-014)**
-   - `SESSION_COOKIE_HTTPONLY = True`
-   - `SESSION_COOKIE_SAMESITE = Strict`
-   - Session timeout: 1 hour
-   - File: `docker/settings.py:139-143`
-
-9. **Dependency Security (CVE-012)**
-   - All dependencies pinned to specific versions
-   - Updated to latest secure versions:
-     - Django 5.2.9 (LTS, 2025-2028) - **Fixed 4 SQL injection CVEs**
-     - requests 2.32.5
-     - xmltodict 0.14.2
-     - Added defusedxml 0.7.1
-   - File: `requirements.txt`
-
-10. **Django SQL Injection Fixes (December 2025)** ✅
-   - Upgraded Django from 4.2.15 to 5.2.9 LTS
-   - Fixed CVE-2025-64459 (CRITICAL) - Django SQL injection
-   - Fixed CVE-2024-53908 (HIGH) - SQL injection in HasKey(lhs, rhs) on Oracle
-   - Fixed CVE-2025-57833 (HIGH) - SQL injection in FilteredRelation column aliases
-   - Fixed CVE-2025-59681 (HIGH) - SQL injection in QuerySet operations on MySQL/MariaDB
-   - See: `DJANGO_UPDATE.md` for details
-
----
-
-## Deployment Security Checklist
-
-### Before Deploying
-
-- [ ] Set `DJANGO_SECRET_KEY` environment variable (50+ random characters)
-- [ ] Set `DEBUG=False` in production environment
-- [ ] Configure `ALLOWED_HOSTS` with specific hostnames
-- [ ] Review and restrict file system permissions on `/opt/xml` and `/opt/notes`
-- [ ] Install all dependencies from pinned `requirements.txt`
-- [ ] Run security audit: `pip-audit`
-- [ ] Run static analysis: `bandit -r .`
-- [ ] Review firewall rules
-- [ ] Ensure application is NOT exposed to public internet
-
-### Environment Variables
-
-```bash
-# Required for production
-export DJANGO_SECRET_KEY="your-50-character-random-secret-key-here"
-export DEBUG="False"
-export ALLOWED_HOSTS="localhost,127.0.0.1"
-
-# Optional - for HTTPS deployments
-export SECURE_SSL_REDIRECT="True"
-export SESSION_COOKIE_SECURE="True"
-export CSRF_COOKIE_SECURE="True"
-```
-
-Generate a secure SECRET_KEY:
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(50))"
-```
-
----
-
-## Security Best Practices
-
-### 1. Network Isolation
-
-**CRITICAL:** This application is designed for localhost use only.
-
-- ✅ Run on `localhost` / `127.0.0.1` only
-- ✅ Use firewall to block external access
-- ✅ If remote access needed, use VPN or SSH tunnel
-- ❌ NEVER expose directly to internet
-
-### 2. File System Permissions
-
-```bash
-# XML files directory (read-only for web server)
-chmod 755 /opt/xml
-chown -R webmap-user:webmap-group /opt/xml
-
-# Notes directory (read-write for web server)
-chmod 750 /opt/notes
-chown -R webmap-user:webmap-group /opt/notes
-
-# Application files (read-only for web server)
-chmod 755 /opt/nmapdashboard
-chown -R root:webmap-group /opt/nmapdashboard
-```
-
-### 3. Input Validation
-
-All user inputs are now validated using `security_utils.py`:
-
-- **Filenames**: Only alphanumeric, dash, underscore, dot
-- **IP Addresses**: Valid IPv4 format
-- **Port Numbers**: 1-65535
-- **MD5 Hashes**: 32 hex characters
-- **CPE Strings**: Valid CPE format
-
-### 4. XML File Handling
-
-When adding Nmap XML files:
-
-```bash
-# Validate XML before uploading
-xmllint --noout scan.xml
-
-# Check for malicious content
-grep -i "<!ENTITY" scan.xml  # Should return nothing
-
-# Copy to container safely
-docker cp scan.xml webmap:/opt/xml/scan.xml
-```
-
-### 5. Monitoring and Logging
-
-Enable Django logging for security events:
-
-```python
-# Add to settings.py
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'file': {
-            'level': 'WARNING',
-            'class': 'logging.FileHandler',
-            'filename': '/var/log/webmap/security.log',
-        },
-    },
-    'loggers': {
-        'django.security': {
-            'handlers': ['file'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-    },
-}
-```
-
-Monitor these logs for:
-- Failed validation attempts
-- Path traversal attempts
-- Unusual API call patterns
-- CSRF token failures
-
----
-
-## Remaining Vulnerabilities
-
-### XSS (Stored) - Partial Mitigation
-
-**Status:** ⚠️ Partially mitigated, requires further work
-
-**Location:** `views.py` and `pdf.py` - HTML string concatenation
-
-**Risk:** MEDIUM
-
-**Current Mitigations:**
-- Django's `html.escape()` used in many places
-- Notes content basic sanitization
-
-**Remaining Issues:**
-- Manual HTML string concatenation still used
-- Some XML fields rendered without full sanitization
-- Base64 decoded content not fully validated
-
-**Recommended Fix:**
-```python
-# Replace manual HTML concatenation with Django templates
-# Before:
-html = '<div>' + user_content + '</div>'
-
-# After:
-from django.template import Template, Context
-template = Template('<div>{{ content }}</div>')
-html = template.render(Context({'content': user_content}))
-```
-
-**Additional Mitigation:**
-- Implement Content Security Policy (CSP) - partially done
-- Use DOMPurify on client side
-- Sanitize all XML content before storage
-
-### File Upload Validation
-
-**Status:** ⚠️ Needs implementation
-
-**Risk:** MEDIUM
-
-**Current State:**
-- No file size validation before processing
-- No file type validation (magic bytes)
-- No rate limiting on file operations
-
-**Recommended Implementation:**
-```python
-def validate_xml_file(filepath, max_size=10485760):  # 10MB
-    # Check file size
-    if os.path.getsize(filepath) > max_size:
-        raise ValidationError('File too large')
-
-    # Validate it's actually XML (magic bytes)
-    with open(filepath, 'rb') as f:
-        header = f.read(5)
-        if not header.startswith(b'<?xml'):
-            raise ValidationError('Invalid XML file')
-
-    # Validate against schema
-    # ... implement XML schema validation
-```
-
----
-
-## Security Testing
-
-### Automated Security Scanning
-
-```bash
-# Install security tools
-pip install bandit safety pip-audit
-
-# Run security linter
-bandit -r . -f json -o reports/bandit-report.json
-
-# Check dependency vulnerabilities
-safety check --json > reports/safety-report.json
-
-# Audit pip packages
-pip-audit --format json > reports/pip-audit-report.json
-```
-
-### Manual Security Testing
-
-1. **Path Traversal Test**
-   ```bash
-   # Should be blocked by validation
-   curl -X POST http://localhost:8000/api/savenotes/ \
-     -d "scanfile=../../etc/passwd&hashstr=test&notes=test"
-   ```
-
-2. **Command Injection Test**
-   ```bash
-   # Should be prevented by subprocess.run()
-   # Session key manipulation no longer possible
-   ```
-
-3. **XSS Test**
-   ```xml
-   <!-- Test with malicious XML -->
-   <nmaprun>
-     <host>
-       <hostnames>
-         <hostname name="<script>alert('XSS')</script>"/>
-       </hostnames>
-     </host>
-   </nmaprun>
-   ```
-
-4. **XXE Test**
-   ```xml
-   <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
-   <nmaprun>&xxe;</nmaprun>
-   ```
-
-### OWASP ZAP Scan
-
-```bash
-# Run OWASP ZAP against the application
-docker run -t owasp/zap2docker-stable zap-baseline.py \
-  -t http://host.docker.internal:8000
-```
-
----
-
-## Incident Response
-
-If you suspect a security breach:
-
-1. **Immediate Actions**
-   - Stop the application: `docker stop webmap`
-   - Isolate the system from network
-   - Preserve logs and file system for forensics
-
-2. **Investigation**
-   - Check `/var/log/webmap/security.log`
-   - Review `/opt/xml` and `/opt/notes` for unusual files
-   - Check system logs: `journalctl -u webmap`
-   - Review Django session data
-
-3. **Recovery**
-   - Restore from clean backup
-   - Rotate all secrets (SECRET_KEY, session data)
-   - Update to latest security patches
-   - Review and strengthen access controls
-
----
-
-## Security Contacts
-
-- **Report Security Issues:** Create a private security advisory on GitHub
-- **Security Updates:** Subscribe to Django security mailing list
-- **CVE Database:** Monitor https://cve.mitre.org/ for related CVEs
-
----
-
-## Changelog
-
-### 2025-12-20 - Major Security Update
-
-**Fixed:**
-- CVE-001: Command Injection in PDF generation
-- CVE-002: Path Traversal vulnerabilities
-- CVE-003: Hardcoded SECRET_KEY
-- CVE-004: DEBUG mode in production
-- CVE-005: Unrestricted ALLOWED_HOSTS
-- CVE-007: XXE injection vulnerability
-- CVE-008: Missing CSRF protection
-- CVE-009: Insufficient input validation
-- CVE-012: Unpinned dependencies
-- CVE-013: Missing security headers
-- CVE-014: Weak session configuration
-
-**Added:**
-- `security_utils.py` - Input validation module
-- Comprehensive input validation
-- Security headers
-- Environment-based configuration
-- Security documentation
-
-**Updated:**
-- `requirements.txt` - Pinned all dependency versions
-- `docker/settings.py` - Secure configuration
-- `api.py` - Security fixes for all endpoints
-
----
-
-## License
-
-This security documentation is provided as-is. Implementation of security measures is the responsibility of the deployer.
-
----
-
-## Additional Resources
-
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [Django Security](https://docs.djangoproject.com/en/stable/topics/security/)
-- [CWE Top 25](https://cwe.mitre.org/top25/)
-- [Python Security Best Practices](https://python.readthedocs.io/en/stable/library/security_warnings.html)
+# Security Policy
+
+WebMap shows Nmap scan results, which describe the attack surface of the
+networks you scan. Treat an instance and its data as sensitive.
+
+## Supported versions
+
+Only the current `v2/master` branch receives security fixes. There are no
+release branches or backports.
+
+| Version | Supported |
+|---|---|
+| `v2/master` (latest commit) | yes |
+| upstream `Rev3rseSecurity/WebMap`, older forks | no |
+
+## Reporting a vulnerability
+
+Do not report vulnerabilities in public issues, pull requests or
+discussions.
+
+Use GitHub's private vulnerability reporting:
+[Security → Report a vulnerability](https://github.com/mkilijanek/WebMap/security/advisories/new).
+If that is not available to you, open an issue that asks for a private
+contact without describing the problem.
+
+Please include the affected commit, the steps or a crafted Nmap XML file
+that reproduces the issue, and the impact you expect.
+
+This is a maintainer-run project without a security team. Reports are
+handled on a best-effort basis, without a guaranteed response or fix time.
+Confirmed issues are fixed on `v2/master` and described in a GitHub
+security advisory; reporters are credited unless they ask not to be.
+
+## Threat model
+
+Intended deployment: one analyst (or a small trusted team) using a single
+login, on `localhost` or a trusted internal network, optionally behind a
+TLS reverse proxy. WebMap is not designed for internet exposure or for
+users who must not see each other's data (there are no per-user
+permissions: every logged-in user sees every scan).
+
+What WebMap treats as untrusted input:
+
+- **Nmap XML content.** A scanned host controls banners, service names,
+  NSE script output, host names and CPE strings. A hostile host can try to
+  attack the analyst's browser (stored XSS) or the PDF renderer through the
+  report. This is the main threat the application is built against.
+- **Scan file names**, from whoever can write to `/opt/xml`.
+- **CVE API responses** from `cve.circl.lu` (fetched over HTTPS).
+- **Requests** from anyone who can reach the port before logging in.
+
+What WebMap trusts: the operator who runs the container, writes scan files
+and holds the login.
+
+## Security controls
+
+| Area | Control | Where |
+|---|---|---|
+| Authentication | Django login on every view (`LoginRequiredMiddleware` plus `login_required` on the app's URLs); user created from `WEBMAP_USER`/`WEBMAP_PASSWORD(_FILE)` with Django's password validators | `docker/settings.py`, `urls.py`, `management/commands/webmap_user.py` |
+| Brute force | Failed logins counted per user name and per client address; at `WEBMAP_LOGIN_MAX_FAILURES` (default 5) further attempts are refused for `WEBMAP_LOGIN_LOCKOUT_SECONDS` (default 900) without checking the password | `auth.py` |
+| Audit | Successful, failed and refused logins, CVE lookup failures, PDF failures and unexpected API errors are logged to stdout | `auth.py`, `api.py`, `LOGGING` in `docker/settings.py` |
+| XSS | All Nmap, notes and CVE values HTML-escaped (`esc()`); links from CVE data only if `http(s)`; notes are plain text; no inline JavaScript in pages; data for scripts passed in `data-*` attributes and a JSON block | `views.py`, `functions.py`, `pdf.py`, `static/async.js` |
+| CSP | `default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'` | `SECURE_CSP` in `docker/settings.py` |
+| Supply chain (front end) | All JavaScript, CSS and fonts vendored with recorded checksums; no CDN | `static/vendor/` |
+| CSRF | POST-only state changes, Django CSRF middleware, `SameSite=Strict` cookies | `api.py`, `views.py` |
+| Headers | `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: same-origin`, `Cross-Origin-Opener-Policy: same-origin`; HSTS opt-in | `docker/settings.py` |
+| Sessions | `HttpOnly`, `SameSite=Strict`, 1 hour, end with the browser; `Secure` with `WEBMAP_HTTPS` | `docker/settings.py` |
+| Files | Scan names restricted to `[A-Za-z0-9_.-]`, no leading dot; paths resolved with symlinks and confined to their directory; annotations only for hosts of the selected scan; atomic writes | `security_utils.py`, `scan.py`, `api.py` |
+| XML parsing | `xmltodict` with `disable_entities=True`, size limit `WEBMAP_MAX_XML_MB`, malformed files reported instead of crashing | `scan.py` |
+| CVE lookup (SSRF) | Fixed HTTPS endpoint, CPE strictly validated, only CPEs present in the selected scan, no redirects, 10 s timeout, response shape checked | `api.py`, `security_utils.py` |
+| PDF | `wkhtmltopdf` started without a shell, HTML on stdin, `--disable-javascript --disable-local-file-access`, one at a time, 60 s timeout | `api.py`, `pdf.py` |
+| Container | Non-root user; code tree root-owned and read-only for that user; only `/opt/notes` and `/opt/webmap-data` writable; `HEALTHCHECK` | `docker/Dockerfile` |
+| Dependencies | Pinned versions; Dependabot; pip-audit, Trivy, OSV-Scanner, CodeQL, Bandit, Semgrep, TruffleHog in CI | `.github/` |
+
+## Known limitations
+
+These are accepted for the intended deployment and documented so that
+nobody relies on protection that is not there.
+
+- **No TLS in the container.** gunicorn speaks plain HTTP on port 8000.
+  For anything but `localhost`, put a TLS reverse proxy in front and set
+  `WEBMAP_HTTPS=true` ([docs/deployment.md](docs/deployment.md)).
+- **One permission level.** Every logged-in user can read every scan and
+  change every annotation.
+- **Login limit is per process.** Counters live in Django's local-memory
+  cache; the container runs one gunicorn worker, so this holds. With more
+  workers or replicas, configure a shared cache. Behind a reverse proxy
+  every request appears to come from the proxy's address, so the
+  per-address limit then acts as a global one (the per-user limit is
+  unaffected).
+- **A locked-out user is locked out too.** Someone who can reach the login
+  page can keep the account locked by failing logins. Keep the port on
+  `localhost` or an internal network.
+- **`style-src 'unsafe-inline'`.** The generated markup uses `style=""`
+  attributes. This does not allow script execution, but CSS injection
+  would not be blocked by the CSP (all values are escaped regardless).
+- **HTML is built by string concatenation** in `views.py` and `pdf.py` and
+  rendered with `|safe`. Every value is escaped by hand with `esc()`; a
+  missed call would be an XSS bug, with the CSP as the second line of
+  defence. Moving the markup into Django templates (auto-escaping) is the
+  long-term fix.
+- **wkhtmltopdf is unmaintained** (archived upstream, old QtWebKit). Known
+  issues include CVE-2022-35583 (SSRF through injected HTML). WebMap only
+  passes escaped HTML, disables JavaScript and local file access, and does
+  not load remote resources; residual risk remains in the rendering engine
+  itself. Replacing it (e.g. WeasyPrint) is planned work.
+- **Django 6.1 is not an LTS release.** It is supported until the next
+  feature release plus a short overlap; plan the move to the next LTS.
+- **CVE lookup endpoint.** The legacy CIRCL `/api/cvefor/` endpoint could
+  not be verified during the v1.2 review; see the README.
+- **Static files** are served by Django (`django.views.static.serve`),
+  which the Django documentation does not recommend for heavy production
+  use. For the single-user deployment this is acceptable.
+- **Annotation keys use MD5** (of addresses and file name plus SHA-256 of
+  the content). They are identifiers, not a security control
+  (`usedforsecurity=False`).
+
+## Security reviews
+
+Each review, its findings and the pull requests that fixed them are listed
+in [docs/security-history.md](docs/security-history.md).

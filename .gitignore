@@ -70,7 +70,7 @@ coverage.xml
 *.mo
 *.pot
 
-# Django 
+# Django
 *.log
 
 # Sphinx documentation
@@ -82,5 +82,8 @@ target/
 #Ipython Notebook
 .ipynb_checkpoints
 
-# webmap PDF report
+# PDF reports written by versions before 2026-10 (now returned directly)
 static/*.pdf
+
+# local environment file (see .env.example)
+.env

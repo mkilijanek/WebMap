@@ -2,46 +2,30 @@ name: Dependency Review
 
 on:
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [v2/master, main, master, develop]
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Dependency Review
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
         with:
-          # Fail on critical and high vulnerabilities
-          fail-on-severity: critical
-
-          # Deny licenses that are not acceptable
-          deny-licenses: GPL-2.0, LGPL-2.0, AGPL-3.0
-
-          # Allow these licenses
-          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
-
-          # Comment on PR with results
-          comment-summary-in-pr: always
-
-          # CVSS threshold
-          fail-on-scopes: runtime
-
-          # Configuration
+          # Severity threshold, allowed licences and scopes live in the
+          # config file. (The action refuses allow-licenses together with
+          # deny-licenses, which this workflow used to set.)
           config-file: './.github/dependency-review-config.yml'
-
-      - name: Upload dependency graph
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: dependency-graph
-          path: dependency-graph.json
-          retention-days: 30
+          comment-summary-in-pr: on-failure

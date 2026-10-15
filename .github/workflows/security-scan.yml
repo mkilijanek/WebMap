@@ -2,234 +2,224 @@ name: Security Scanning
 
 on:
   push:
-    branches: [ main, master, develop, claude/* ]
+    branches: [v2/master, main, master, develop, 'claude/*']
   pull_request:
-    branches: [ main, master, develop ]
+    # v2/master is the default branch; PRs against it were not scanned before.
+    branches: [v2/master, main, master, develop]
   schedule:
-    # Run security scan daily at 2:00 AM UTC
+    # Daily at 2:00 AM UTC
     - cron: '0 2 * * *'
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 permissions:
   contents: read
-  security-events: write
-  actions: read
+
+env:
+  # Django 6.x requires Python >= 3.12; the container uses 3.12 as well.
+  PYTHON_VERSION: '3.12'
 
 jobs:
-  # Job 1: Dependency vulnerability scanning with pip-audit
+  # Unit tests, run the way docker/Dockerfile assembles the project.
+  tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          path: nmapreport
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Run tests
+        run: |
+          python -m pip install -r nmapreport/requirements.txt
+          django-admin startproject nmapdashboard project
+          cp nmapreport/docker/settings.py nmapreport/docker/urls.py project/nmapdashboard/
+          mv nmapreport project/
+          cd project
+          WEBMAP_DB_PATH="$PWD/db.sqlite3" DJANGO_SECRET_KEY=ci-only python manage.py check
+          WEBMAP_DB_PATH="$PWD/db.sqlite3" DJANGO_SECRET_KEY=ci-only python manage.py test nmapreport
+
+  # Known vulnerabilities in the pinned dependencies. Fails the run.
   dependency-scan:
     name: Dependency Vulnerability Scan
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pip-audit safety
+      - name: Install pip-audit
+        run: python -m pip install pip-audit==2.10.1
 
       - name: Run pip-audit
         run: |
-          echo "Running pip-audit to check for known vulnerabilities..."
-          pip-audit -r requirements.txt --format json --output pip-audit-report.json || true
-          pip-audit -r requirements.txt --format markdown --output pip-audit-report.md || true
-          pip-audit -r requirements.txt || true
-        continue-on-error: true
-
-      - name: Run Safety check
-        run: |
-          echo "Running Safety to check for known security vulnerabilities..."
-          # Install dependencies first
-          pip install -r requirements.txt
-
-          # Run Safety scan (CLI 3 recommended command)
-          safety scan --json --output safety-report.json || true
-          safety scan || true
-        continue-on-error: true
+          # requirements.txt plus the server the container installs
+          { cat requirements.txt; echo 'gunicorn==23.0.0'; } > audit-requirements.txt
+          pip-audit -r audit-requirements.txt --format markdown --output pip-audit-report.md || status=$?
+          # pip-audit writes no report file when nothing is found
+          if [ -s pip-audit-report.md ]; then
+            cat pip-audit-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'pip-audit: no known vulnerabilities found' | tee pip-audit-report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "${status:-0}"
 
       - name: Upload pip-audit report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: pip-audit-report
-          path: |
-            pip-audit-report.json
-            pip-audit-report.md
+          path: pip-audit-report.md
           retention-days: 30
 
-      - name: Upload Safety report
-        uses: actions/upload-artifact@v6
-        if: always()
-        with:
-          name: safety-report
-          path: safety-report.json
-          retention-days: 30
-
-  # Job 2: Static code analysis with Bandit
+  # Python security linter. Fails on medium/high findings (see .bandit).
   static-analysis:
     name: Static Security Analysis (Bandit)
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install Bandit
+        run: python -m pip install 'bandit[toml]==1.9.4'
+
+      - name: Run Bandit
         run: |
-          python -m pip install --upgrade pip
-          pip install bandit[toml]
-
-      - name: Run Bandit security linter
-        run: |
-          echo "Running Bandit static security analysis..."
-          bandit -r . \
-            --exclude .git,.github,venv,env,.venv \
-            --format json \
-            --output bandit-report.json \
-            --severity-level medium \
-            --confidence-level medium || true
-
-          bandit -r . \
-            --exclude .git,.github,venv,env,.venv \
-            --format txt \
-            --output bandit-report.txt \
-            --severity-level medium \
-            --confidence-level medium || true
-
-          # Show results
-          bandit -r . \
-            --exclude .git,.github,venv,env,.venv \
-            --severity-level medium \
-            --confidence-level medium || true
-        continue-on-error: true
+          bandit -r . --ini .bandit --format json --output bandit-report.json --exit-zero
+          bandit -r . --ini .bandit --severity-level medium --confidence-level medium
 
       - name: Upload Bandit report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: bandit-report
-          path: |
-            bandit-report.json
-            bandit-report.txt
+          path: bandit-report.json
           retention-days: 30
 
-  # Job 3: Secret scanning with TruffleHog
+  # Verified secrets in the git history. Fails the run.
   secret-scan:
     name: Secret Scanning
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          fetch-depth: 0  # Full history for secret scanning
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: TruffleHog OSS
         uses: trufflesecurity/trufflehog@e76dff8a7e57d6df0c60ad8cbf5d5cba505a8fc9 # v3.99.2
         with:
-          path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: --debug --only-verified
-        continue-on-error: true
+          extra_args: --only-verified
 
-  # Job 4: SAST with Semgrep
+  # SAST with Semgrep registry rule packs (report only).
   sast-scan:
     name: SAST Scan (Semgrep)
     runs-on: ubuntu-latest
-
-    container:
-      image: returntocorp/semgrep
-
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Run Semgrep
         run: |
-          semgrep scan \
-            --config auto \
-            --sarif \
-            -o semgrep-report.sarif || true
-
-          semgrep scan \
-            --config auto \
-            --json \
-            -o semgrep-report.json || true
+          python -m pip install semgrep==1.181.0
+          semgrep scan --metrics off \
+            --config p/python --config p/django --config p/javascript \
+            --config p/github-actions --config p/dockerfile \
+            --exclude static/vendor \
+            --sarif --output semgrep-report.sarif
         continue-on-error: true
 
       - name: Upload Semgrep report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: semgrep-report
-          path: |
-            semgrep-report.sarif
-            semgrep-report.json
+          path: semgrep-report.sarif
           retention-days: 30
 
-  # Job 5: Trivy vulnerability scanner
+  # Dependencies, Dockerfile misconfiguration and secrets; results go to the
+  # Security tab.
   trivy-scan:
     name: Trivy Security Scan
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Run Trivy vulnerability scanner in fs mode
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
+          scanners: 'vuln,secret,misconfig'
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH,MEDIUM'
 
       - name: Upload Trivy results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
 
-  # Job 6: Security summary report
   security-summary:
     name: Security Summary
     runs-on: ubuntu-latest
-    needs: [dependency-scan, static-analysis, secret-scan, sast-scan, trivy-scan]
+    needs: [tests, dependency-scan, static-analysis, secret-scan, sast-scan, trivy-scan]
     if: always()
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v7
-        continue-on-error: true
-
       - name: Generate security summary
+        env:
+          TESTS: ${{ needs.tests.result }}
+          DEPS: ${{ needs.dependency-scan.result }}
+          BANDIT: ${{ needs.static-analysis.result }}
+          SECRETS: ${{ needs.secret-scan.result }}
+          SAST: ${{ needs.sast-scan.result }}
+          TRIVY: ${{ needs.trivy-scan.result }}
         run: |
-          echo "# Security Scan Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Scan Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Dependency Scan: ${{ needs.dependency-scan.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Static Analysis: ${{ needs.static-analysis.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Secret Scan: ${{ needs.secret-scan.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ SAST Scan: ${{ needs.sast-scan.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Trivy Scan: ${{ needs.trivy-scan.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "See artifacts for detailed reports." >> $GITHUB_STEP_SUMMARY
+          {
+            echo "# Security Scan Summary"
+            echo
+            echo "| Job | Result |"
+            echo "|---|---|"
+            echo "| Unit tests | $TESTS |"
+            echo "| Dependency scan (pip-audit) | $DEPS |"
+            echo "| Static analysis (Bandit) | $BANDIT |"
+            echo "| Secret scan (TruffleHog) | $SECRETS |"
+            echo "| SAST (Semgrep, report only) | $SAST |"
+            echo "| Trivy | $TRIVY |"
+            echo
+            echo "Detailed reports are attached as workflow artifacts."
+          } >> "$GITHUB_STEP_SUMMARY"
