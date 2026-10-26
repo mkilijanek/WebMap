@@ -19,7 +19,7 @@
 # no HTTPS here. All settings: docs/configuration.md; remote access and
 # hardening: docs/deployment.md.
 
-FROM python:3.12-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 # Not version-pinned on purpose: the rebuild should pick up Debian security
 # updates. wkhtmltopdf is unmaintained upstream; see SECURITY.md.
