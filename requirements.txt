@@ -5,7 +5,7 @@
 
 # Web framework. 6.1 is a feature release, not LTS: plan the move to the
 # next LTS (6.2) when it is out.
-Django==6.1.2
+Django==6.1.3
 
 # HTTPS client for the CVE lookup (cve.circl.lu)
 requests==2.34.2
